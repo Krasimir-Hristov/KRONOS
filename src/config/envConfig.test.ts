@@ -18,11 +18,18 @@ describe('envConfig & aiModelsConfig', () => {
     }
   });
 
-  it('rejects KRONOS_PIN_SECRET shorter than 32 characters', () => {
-    const result = parseServerEnv({
-      KRONOS_PIN_SECRET: 'too-short-secret',
-    });
-    expect(result.ok).toBe(false);
+  it('rejects KRONOS_PIN_SECRET or KRONOS_VAULT_ENCRYPTION_KEY shorter than 32 characters', () => {
+    expect(
+      parseServerEnv({
+        KRONOS_PIN_SECRET: 'too-short-secret',
+      }).ok
+    ).toBe(false);
+
+    expect(
+      parseServerEnv({
+        KRONOS_VAULT_ENCRYPTION_KEY: 'short-vault-key',
+      }).ok
+    ).toBe(false);
   });
 
   it('exposes canonical OpenRouter endpoints, safety caps, and model overrides', () => {

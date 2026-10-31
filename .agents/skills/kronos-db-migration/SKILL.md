@@ -2,37 +2,39 @@
 name: kronos-db-migration
 description: >-
   Design, update, and migrate the KRONOS PostgreSQL + pgvector database schema using
-  Drizzle ORM and the Supabase MCP server. Activate when creating or modifying tables,
-  indexes, pgvector embeddings, Full-Text Search, Row-Level Security (RLS), or cron jobs.
+  pure Supabase SQL migrations, Supabase MCP, and @supabase/supabase-js. Activate when
+  creating or modifying tables, indexes, pgvector embeddings, Full-Text Search,
+  vault_items encryption columns, Row-Level Security (RLS), or cron jobs.
 ---
 
 # KRONOS Database & Supabase Migration Runbook
 
-KRONOS uses **Drizzle ORM** (`drizzle-kit` SQL migrations) as the Single Source of Truth for types, backed by **Supabase PostgreSQL**.
+KRONOS uses **pure Supabase SQL migrations** (`supabase/migrations/*.sql`) and **Supabase MCP** (`apply_migration` + `generate_typescript_types`) with `@supabase/supabase-js` and `@supabase/ssr` — **no Drizzle ORM and no Prisma ORM**.
 
 ## Core Schema Rules
 
-1. **File Naming & Types**:
-   - Place schema files in `src/db/schema/` using `camelCase.ts` (e.g. `profilesSchema.ts`, `documentsSchema.ts`, `shoppingItemsSchema.ts`, `chatSessionsSchema.ts`).
-   - Export inferred types directly: `export type DocumentRow = typeof documents.$inferSelect;` and `export type NewDocumentRow = typeof documents.$inferInsert;`.
+1. **Generated Types as Single Source of Truth**:
+   - Store SQL migrations cleanly in `supabase/migrations/`.
+   - After any schema change, run Supabase MCP `generate_typescript_types` and write the output to `src/types/databaseTypes.ts` (never use `any`).
 
 2. **Vector Search (`pgvector`)**:
    - Enable extension `vector` in Supabase.
-   - Use `vector('embedding', { dimensions: 1536 })` matching `openai/text-embedding-3-small` in `src/config/aiModelsConfig.ts`.
-   - Create an **HNSW index** (`USING hnsw (embedding vector_cosine_ops)`) rather than IVFFlat so vector queries stay fast and accurate from row 1 upward.
+   - Use `vector(1536)` matching `openai/text-embedding-3-small` in `src/config/aiModelsConfig.ts`.
+   - Create an **HNSW index** (`USING hnsw (embedding vector_cosine_ops)`) so vector queries stay fast and accurate at any scale.
 
-3. **Multi-Script Full-Text & Exact SQL Search (DE / BG / EL)**:
-   - Family documents combine **German** (`Kontoauszug`, `Antrag`, IBANs, `03/2023`), **Bulgarian**, and **Greek**.
-   - Add B-Tree composite indexes on `(owner_id, doc_type, doc_year, doc_month)` and `(expires_at)` (for `archiveCleanupAgent.ts`).
-   - Enable `pg_trgm` and add a `GIN` Full-Text index using the `'simple'` configuration (plus trigram index on `title` / `sender`) so exact numbers, German compounds, Cyrillic, and Greek words all match reliably.
+3. **Two-Tier Smart Search & Multi-Script FTS (DE / BG / EL)**:
+   - Documents combine **German** (`Kinderzuschlag`, `Wohngeld`, `Kontoauszug`, IBANs), **Bulgarian**, and **Greek**.
+   - Maintain both `doc_date` (date printed on the document) and `created_at` (upload timestamp) with B-Tree indexes, plus `expires_at` index.
+   - Enable `pg_trgm` and add a `GIN` Full-Text index using `'simple'` configuration plus trigram indexes on `title`, `topic`, and `sender`.
 
-4. **Row-Level Security (RLS) & Storage Hygiene**:
-   - Enable RLS on **every** public table immediately upon creation.
-   - Distinguish private per-parent tables (e.g. personal chat history) from shared family tables (documents vault, shopping list, kids profiles).
-   - Whenever deleting document rows, always delete the corresponding object in **Cloudflare R2** in the DAL workflow so orphan blobs never accumulate.
+4. **Vault Facts, Encrypted Secrets & Hard Purge Everywhere**:
+   - In `vault_items`, preserve `source_document_id` (`REFERENCES public.documents(id) ON DELETE SET NULL`) so extracted facts like `Steuer-ID` link directly to their source document when uploaded, or stay `null` when provided directly without a document.
+   - Passwords and secrets (`is_secret = true`) MUST store ciphertext in `value_encrypted` (`AES-256-GCM`) with `value_plain = NULL`, and MUST NEVER be embedded into vector columns.
+   - Deleting a document MUST physically delete both the **Cloudflare R2** object and the **Supabase** row + vectors (`Hard Purge Everywhere`).
+   - Enable Row-Level Security (RLS) on **every** public table immediately upon creation.
 
 ## Migration & Verification Steps
 
-1. Generate SQL migration via `pnpm db:generate` and inspect the generated `.sql` file before applying.
-2. Apply migration via Supabase MCP (`apply_migration`) or `pnpm db:migrate`, then run Supabase MCP `get_advisors` (`security` + `performance`) to verify zero missing RLS policies or unindexed foreign keys.
-3. Run `pnpm verify` to confirm full TypeScript & build health.
+1. Write and review the `.sql` migration file in `supabase/migrations/`.
+2. Apply via Supabase MCP (`apply_migration`), regenerate `src/types/databaseTypes.ts` via `generate_typescript_types`, and run Supabase MCP `get_advisors` (`security` + `performance`).
+3. Run `pnpm verify` to confirm zero TypeScript, ESLint, test, or build errors.

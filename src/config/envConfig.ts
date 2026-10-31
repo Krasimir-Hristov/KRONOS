@@ -9,8 +9,9 @@ const publicEnvSchema = z.object({
 const serverEnvSchema = publicEnvSchema.extend({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   KRONOS_PIN_SECRET: z.string().min(32).optional(),
+  KRONOS_VAULT_ENCRYPTION_KEY: z.string().min(32).optional(),
+  CRON_SECRET: z.string().min(32).optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
-  DATABASE_URL: z.string().min(1).optional(),
   R2_ACCOUNT_ID: z.string().min(1).optional(),
   R2_ACCESS_KEY_ID: z.string().min(1).optional(),
   R2_SECRET_ACCESS_KEY: z.string().min(1).optional(),

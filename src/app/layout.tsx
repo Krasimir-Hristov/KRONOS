@@ -13,11 +13,11 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: 'KRONOS — Личен & Семеен AI Асистент и Архив',
+    default: 'KRONOS — Личен AI Асистент, Документен Сейф & Памет',
     template: '%s | KRONOS',
   },
   description:
-    'KRONOS (Κρόνος) — Защитен семеен документен сейф и мулти-агентен AI асистент на български и гръцки език.',
+    'KRONOS (Κρόνος) — Личен модулен AI Асистент и Документен Сейф за документи (DE/BG/EL), криптирани пароли и помощ с немски институции.',
 };
 
 interface RootLayoutProps {

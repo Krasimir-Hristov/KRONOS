@@ -1,7 +1,7 @@
 ---
 name: kronos-phase-gate
 description: >-
-  Run the mandatory KRONOS v4 architecture and quality verification gate.
+  Run the mandatory KRONOS architecture and quality verification gate.
   Activate this skill before concluding any coding task, feature addition, refactoring,
   or phase milestone to verify file naming (camelCase.ts / PascalCase.tsx), 300-line cap,
   no-middleware policy, Tailwind v4 syntax, strict TypeScript, ESLint, Vitest, and Next.js build.
@@ -30,7 +30,7 @@ No step or phase in KRONOS may be marked complete until every check in this runb
    ```powershell
    pnpm typecheck
    ```
-   Fix all type mismatches using Drizzle `$inferSelect` / Zod `z.infer` — never introduce `any` or unsafe type assertions.
+   Fix all type mismatches using `src/types/databaseTypes.ts` and Zod `z.infer` — never introduce `any`.
 
 3. **ESLint Check**:
    ```powershell
@@ -41,7 +41,7 @@ No step or phase in KRONOS may be marked complete until every check in this runb
    ```powershell
    pnpm test
    ```
-   Ensure critical Zod schemas, security utilities, DAL boundaries, and AI routers have passing unit tests.
+   Ensure critical Zod schemas, PIN/AES-256-GCM cryptography, DAL boundaries, and AI routers have passing unit tests.
 
 5. **Production Next.js 16 Build**:
    ```powershell

@@ -1,0 +1,50 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+
+language: "bg-BG"
+early_access: true
+
+reviews:
+  profile: "assertive"
+  request_changes_workflow: true
+  high_level_summary: true
+  poem: false
+  review_status: true
+  collapse_walkthrough: false
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - "main"
+
+  path_instructions:
+    - path: "src/**"
+      instructions: |
+        Провери стриктно всяко изменение спрямо инженерната конституция в `AGENTS.md`:
+        1. Именуване на файлове: Всички не-компонентни файлове ТРЯБВА да са в `camelCase.ts` (и `camelCase.test.ts`), а всички React компоненти в `PascalCase.tsx` (изключение са само системните маршрутни файлове на Next.js 16 в `src/app/` и `src/proxy.ts`).
+        2. Забрана за `middleware.ts`: Никога не допускай `middleware.ts`. Мрежовият периметър е единствено в `src/proxy.ts` с Allowlist Header Scrubbing срещу CVE-2025-29927.
+        3. Лимит на размер и модулност: Нито един файл в `src/` не може да надвишава 300 реда. Feature модулите в `src/features/<featureName>/` се импортират отвън само през техния `index.ts`.
+        4. Строг TypeScript и двойна Zod бариера: Абсолютна забрана за `any`. Всички външни входове и отговори от OpenRouter / външни API-та се валидират със `schema.safeParse()` в `try/catch` блок без изтичане на сурови системни грешки към клиента.
+        5. React & UI стандарт: React компонентите задължително са Arrow Functions, използват семантичен HTML5, `aria-label` на интерактивните елементи, `next-intl` за текстовете и Tailwind CSS v4 градиенти (`bg-linear-to-*`, никога `bg-gradient-to-*`).
+
+    - path: "src/features/**"
+      instructions: |
+        Следи за:
+        1. Защита на данните (Defense in Depth): Всеки DAL метод и Server Action трябва да извиква сървърната проверка за Supabase сесия + 4-цифрен ПИН (и допълнително Step-Up ПИН потвърждение при четене, промяна или изтриване на пароли!).
+        2. Сигурност на пароли (`vault_items`): Пароли и тайни (`is_secret = true`) НИКОГА не трябва да се записват в прав текст в базата данни и НИКОГА не трябва да се подават за генериране на embeddings/вектори. Задължително използвай сървърно `AES-256-GCM` криптиране.
+        3. Пълно физическо изтриване (Hard Purge Everywhere): При изтриване на документ провери дали се изтрива едновременно физическият обект от Cloudflare R2, редът и векторът от Supabase и дали се почистват референциите/кешът без да остават следи.
+
+    - path: "supabase/**"
+      instructions: |
+        Провери дали всяка таблица има активиран Row-Level Security (RLS) с точни политики за собственост (`auth.uid()`), подходящи B-Tree / GIN Full-Text индекси (DE/BG/EL) и `HNSW` индекс за `pgvector(1536)`.
+
+chat:
+  auto_reply: true
+
+knowledge_base:
+  opt_out: false
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - "AGENTS.md"
+      - "ROADMAP.md"
+      - ".agents/skills/**/SKILL.md"

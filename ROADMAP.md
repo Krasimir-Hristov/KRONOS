@@ -1,131 +1,88 @@
-# KRONOS (Κρόνος) — Пътна Карта на Проекта (Roadmap v4)
+# KRONOS (Κρόνος) — Пътна Карта до Production (Roadmap)
 
-Този документ отразява актуалния прогрес, завършените етапи и предстоящите фази на KRONOS според Архитектурен План v4 и Инженерната Конституция (`AGENTS.md`).
+Този документ следи стъпките за изграждане и пускане в **Production** на **KRONOS** — лична AI система (**Главен AI Бот + Личен Admin RAG Dashboard**) за документи (DE / BG / EL), лични данни и криптирани пароли, и помощ при онлайн и PDF процедури пред немски институции (`Wohngeld`, `Kinderzuschlag` и др.).
 
 ---
 
-## 📊 Общ Преглед на Прогреса
+## 📊 Пътят до Production (100% Фокус върху Документите и RAG Сейфа)
 
 ```mermaid
 flowchart LR
-    P0["Фаза 0: Ядро & Конституция"] --> P1["Фаза 1: База данни, ПИН & R2"]
-    P1 --> P2["Фаза 2: Сейф /documents & OCR"]
-    P2 --> P3["Фаза 3: AI Чат, Камера & Jev"]
-    P3 --> P4["Фаза 4: Първи Субагенти & /family"]
-    P4 --> P5["Фаза 5: Пазаруване, Nano Banana & Учител"]
-    P5 --> P6["Фаза 6+: Финанси, YouTube & GPS"]
+    P0["Фаза 0: Ядро & Правила"] --> P1["Фаза 1: База, 4-Цифрен ПИН, R2 & LangGraph"]
+    P1 --> P2["Фаза 2: Масов RAG Сейф & Панел Данни/Пароли"]
+    P2 --> P3["Фаза 3: Бот, Jev Търсене & Wohngeld/KiZ Субагенти"]
+    P3 --> PROD["🚀 Production в Vercel & Реална Употреба"]
 
     style P0 fill:#10b981,stroke:#059669,stroke-width:2px,color:#ffffff
     style P1 fill:#f59e0b,stroke:#d97706,stroke-width:3px,color:#000000
     style P2 fill:#1e293b,stroke:#475569,stroke-width:1px,color:#94a3b8
     style P3 fill:#1e293b,stroke:#475569,stroke-width:1px,color:#94a3b8
-    style P4 fill:#1e293b,stroke:#475569,stroke-width:1px,color:#94a3b8
-    style P5 fill:#1e293b,stroke:#475569,stroke-width:1px,color:#94a3b8
-    style P6 fill:#1e293b,stroke:#475569,stroke-width:1px,color:#94a3b8
+    style PROD fill:#0284c7,stroke:#38bdf8,stroke-width:2px,color:#ffffff
 ```
 
-| Фаза | Име на Фазата | Статус | Фокус |
-| :--- | :--- | :---: | :--- |
-| **Фаза 0** | **Конституция, Skills & Next.js 16 Скелет** | ✅ **Завършена** | `AGENTS.md`, 4 скила, `verifyArchitecture.mjs`, `src/proxy.ts`, BG/EL i18n, Vitest, Turbopack Build |
-| **Фаза 1** | **База Данни, Двоен Вход & Cloudflare R2** | ⏳ **Следваща** | Drizzle ORM + Supabase PostgreSQL (`pgvector(1536)` HNSW, FTS, `expires_at`), 15-мин Банков ПИН + Kids Lock, R2 S3 Presigned URLs |
-| **Фаза 2** | **Сейф `/documents` & Веднага Качване** | 📋 Планирана | Качване на PDF/снимки, Конвертор Снимки ➔ PDF, Gemini Flash OCR, филтри, Split-Screen / Мобилен преглед, Принт, Изтриване |
-| **Фаза 3** | **Личен AI Асистент `/chat` & Jev Диспечер** | 📋 Планирана | Чат за 2-та профила, 📷 Камера без запис, Whisper STT + TTS, `jevRouter.ts` (1.5s таймаут) + `traditionalSupervisor.ts` бекъп |
-| **Фаза 4** | **Първи Субагенти & Семеен Център `/family`** | 📋 Планирана | LangGraph: `archiveSearchAgent`, `germanAntragAgent`, `archiveCleanupAgent`, `shoppingListAgent` + реално-времеви списък за покупки |
-| **Фаза 5** | **Онлайн Пазаруване, Nano Banana & Детски Учител** | 📋 Планирана | `shoppingWebAgent` (Amazon/Otto/Idealo), `imageStudioAgent` (Nano Banana 2 / Pro с насочващи въпроси), `kidsTutorAgent` с ПИН катинар |
-| **Фаза 6+**| **Финансов Съветник `/finance`, YouTube & GPS** | 📋 Планирана | `financeAdvisorAgent` (Kontoauszüge & Kassenbons), `youtubeDjAgent` (плейлисти), `localExplorerAgent` (GPS + Open-Meteo) |
+| Фаза | Фокус | Статус |
+| :--- | :--- | :---: |
+| **Фаза 0** | **Конституция (`AGENTS.md`), Antigravity Skills, CodeRabbit & Next.js 16 Ядро** | ✅ **Завършена** |
+| **Фаза 1** | **Supabase База (MCP), 4-Цифрен ПИН, Криптиране на Пароли, R2 (`50 MB`), `next-intl` & LangGraph** | ⏳ **Текуща** |
+| **Фаза 2** | **Директен Масов RAG Сейф (`/documents` без бота), Сваляне/ZIP/PDF & Панел Данни/Пароли (`/vault`)** | 📋 Следваща |
+| **Фаза 3** | **Главен AI Бот (Jev Reranking за Зона 1 + Зона 2) & Субагенти за Онлайн Портали и PDF Молби** | 📋 Планирана |
+| **Production** | **Деплой във Vercel, ежедневна реална работа и планиране на нови модули според нуждите** | 🎯 Цел |
 
 ---
 
-## 📌 Детайлен Статус по Фази
+## 📌 Детайлен Обхват по Фази
 
-### ✅ Фаза 0: Инженерна Конституция, Antigravity Skills & Next.js 16 Скелет (ЗАВЪРШЕНА)
-- [x] **Върховна конституция (`AGENTS.md`)**:
-  - Приоритет на `camelCase.ts` / `PascalCase.tsx` и Vitest пред глобалните конвенции.
-  - Лимит 250–300 реда на файл, забрана за `any`, двойна Zod бариера, забрана за `middleware.ts`.
-  - Двуслойна защита при AI грешки (Jev ➔ Backup Supervisor ➔ Graceful Degradation съобщение на BG/EL).
-- [x] **4 специализирани Antigravity скила в `.agents/skills/`**:
-  - `kronos-phase-gate` с автоматичен страж `verifyArchitecture.mjs` (тестване за `middleware.ts`, лимит на редове, конвенции и стари Tailwind класове).
-  - `kronos-feature-scaffold` (шаблон за изолирани `src/features/<featureName>/` модули с `server-only` DAL).
-  - `kronos-subagent-builder` (шаблон за Plug-and-Play субагенти за Jev и LangGraph).
-  - `kronos-db-migration` (процедура за Drizzle ORM + Supabase MCP).
-- [x] **Next.js 16 ядро & Мрежова защита**:
-  - Мрежов периметър `src/proxy.ts` с Allowlist Header Scrubbing (`headerScrubber.ts`) срещу CVE-2025-29927 (запазва `x-forwarded-host` за Server Actions CSRF).
-  - Изолация за `kronos_kids_lock` режим.
-- [x] **Двуезичен интерфейс (🇧🇬 BG / 🇬🇷 EL) & App Shell**:
-  - Строго типизиран речник (`bgDictionary.ts`, `elDictionary.ts`), `LanguageContext.tsx`.
-  - Responsive App Shell (странично меню за компютър + долна лента с 4 икони за телефон).
-  - Конфигуриран `QueryProvider` (TanStack Query v5) и PWA `manifest.ts`.
-- [x] **100% преминат QA гейт (`pnpm verify`)**:
-  - `verify:arch` ➔ 0 нарушения.
-  - `typecheck` (TypeScript 6.0.3 strict) ➔ 0 грешки.
-  - `lint` (ESLint 10 с забрана за `any`) ➔ 0 грешки.
-  - `test` (Vitest unit тестове за хедъри, env и i18n) ➔ 8/8 успешни теста.
-  - `build` ➔ чист Next.js 16 Turbopack production билд.
-- [x] Първи къмит и пуш в GitHub: `https://github.com/Krasimir-Hristov/KRONOS.git` (клон `main`).
+### ✅ Фаза 0: Инженерна Конституция, Автоматични Проверки & Скелет (ЗАВЪРШЕНА)
+- [x] Върховна конституция в `AGENTS.md` и `.coderabbit.yaml` на български език (`bg-BG`).
+- [x] 4 специализирани Antigravity скила в `.agents/skills/` + автоматичен страж `verifyArchitecture.mjs` (`camelCase.ts` за спомагателни файлове/функции, `PascalCase.tsx` с Arrow Functions за компоненти, лимит 300 реда, без `middleware.ts`).
+- [x] Защитен мрежов периметър `src/proxy.ts` с Allowlist Header Scrubbing срещу CVE-2025-29927.
+- [x] Подготвен `.env` с генерирани 256-битови криптографски ключове.
 
 ---
 
-### ⏳ Фаза 1: База Данни, Двоен Вход & Cloudflare R2 (ПРЕДСТОЯЩА)
-- [ ] **Drizzle ORM Схема за Supabase PostgreSQL**:
-  - Таблица `profiles` (2 родителски профила + детски профили).
-  - Таблица `documents` (заглавие, тип, подател, дата, година, месец, метаданни, суров OCR текст, статус).
-  - `pgvector(1536)` колона `embedding` с HNSW индекс (`vector_cosine_ops`).
-  - Твърдо B-Tree индексиране по `(owner_id, doc_type, doc_year, doc_month)` и `(expires_at)`.
-  - Многоезичен Full-Text Search (GIN индекс с `'simple'` речник за немски, български и гръцки думи + IBAN номера).
-  - Таблици за чат сесии (`chat_sessions`, `chat_messages`) и покупки (`shopping_items`).
-  - Активиране на Row-Level Security (RLS) политики.
-- [ ] **Двоен Вход (Supabase Auth + 15-мин Банков ПИН)**:
-  - Supabase Auth вход (Email / Magic Link / Passkey).
-  - Криптиран `HttpOnly` cookie за Банковия ПИН с 15-минутен sliding TTL при активност.
-  - Отделен флаг `kronos_kids_lock` за заключване на приложението само в `/chat` за децата.
-  - Помощна функция `requireAuthAndPin()` за Defense in Depth във всички Server Actions и DAL методи.
-- [ ] **Cloudflare R2 интеграция (S3 Presigned URLs)**:
-  - Качване директно от клиента към R2 без преминаване през 4.5 MB лимита на Vercel.
-  - Защитено четене чрез временни Signed URLs.
-  - Пълно паралелно изтриване (Supabase запис + Cloudflare R2 файл едновременно).
-- [ ] Cron endpoint срещу заспиване на безплатния Supabase проект.
-- [ ] Изпълнение на Phase Gate (`pnpm verify`).
+### ⏳ Фаза 1: Инфраструктура, Вход с 4-Цифрен ПИН, Криптиране & LangGraph Ядро (ТЕКУЩА)
+- [ ] **Инсталиране на основните пакети:**
+  - `@langchain/core`, `@langchain/langgraph`, `@langchain/openai` (насочен към OpenRouter).
+  - `next-intl` (официална i18n система на Български).
+  - `@supabase/supabase-js`, `@supabase/ssr` (чист Supabase SDK без Drizzle/Prisma).
+  - `aws4fetch` (лек 4 KB клиент за Cloudflare R2 до `50 MB`/файл без AWS SDK).
+- [ ] **Supabase PostgreSQL + `pgvector` Схема (чрез Supabase MCP + автоматични типове):**
+  - `profiles` — профил + `scrypt` хеш на 4-цифрения ПИН + защита при 5 грешни опита.
+  - `documents` — заглавие, тема/служба (`Kinderzuschlag`, `Wohngeld`, `Kontoauszug` и др.), `doc_date` (дата от самия документ), `created_at` (дата на качване), `expires_at`, `r2_object_key`, OCR текст (DE/BG/EL) и `pgvector(1536)` HNSW + Full-Text индекси.
+  - `vault_items` — лични данни и пароли с `source_document_id` (референция към документа при извлечено `Steuer-ID` и др., или `null` при директно въведен факт/парола) и сървърно `AES-256-GCM` криптиране за пароли (`is_secret = true`).
+  - `chat_sessions` и `chat_messages` + строги RLS политики на всички таблици.
+- [ ] **Двоен Вход & Защита на Пароли:**
+  - `Email + Парола` (`/login`) + **точно 4-цифрен ПИН** (`/pin`), отключващ се автоматично на 4-тата цифра (15-мин sliding `HttpOnly` cookie).
+  - Допълнително **Step-Up ПИН потвърждение** за секция **🔐 Пароли** (при отваряне, преглед, промяна и изтриване).
+- [ ] **Cloudflare R2 (`50 MB`) + централна `Hard Purge` логика + Keep-Alive Cron за Vercel.**
+- [ ] **Чист Production Admin Shell:** само `🤖 AI Асистент`, `📂 Документен Сейф` и `🗂️ Данни & 🔐 Пароли` (без никакви празни бъдещи табове).
 
 ---
 
-### 📋 Фаза 2: Сейф `/documents` & Веднага Качване на Документи
-- [ ] UI за качване на снимки и PDF документи с Drag-and-Drop и от камера на телефона.
-- [ ] Вграден конвертор Снимки ➔ Един общ PDF (`pdf-lib` + `browser-image-compression`).
-- [ ] Автоматичен OCR анализ с Gemini Flash през OpenRouter (разпознаване на Kontoauszug, молби, година/месец, краен срок `expires_at`).
-- [ ] Бърза търсачка с комбинирани SQL филтри (по година, месец, тип, подател) + таб „🧹 За почистване“.
-- [ ] Split-Screen преглед на десктоп и мобилен преглед на цял екран със системна поддръжка за бутон „Назад“.
-- [ ] Принтиране, сваляне и масово изтриване от базата и R2 едновременно.
+### 📋 Фаза 2: Директен Масов RAG Сейф (`/documents`) & Ръчен Панел за Данни и Пароли (`/vault`)
+*(Веднага след Фаза 2 започваш директно да качваш всички документи в сейфа, без да ти трябва дори чатът!)*
+- [ ] **Масово Drag & Drop Качване в RAG Сейфа (10–20+ файла наведнъж) + Снимане от Телефон:**
+  - Качване на готови PDF-и (`Kontoauszüge`, договори, актове) от компютър или многостранични снимки от телефон ➔ PDF в R2.
+  - Автоматична опашка (OCR на DE/BG/EL + векторизиране за RAG + предложение за ясно заглавие, `doc_date` и открити факти като `Steuer-ID` / `IBAN`) със списък за **„✅ Одобри всички“** или бърза редакция на отделен ред.
+- [ ] **Бърза класическа търсачка в `/documents` (SQL + Full-Text + вектори):**
+  - Филтри по тема/институция и сортиране по `doc_date` или `created_at` (`0 €`, мигновено).
+- [ ] **Работа с Отделни Файлове за Онлайн Портали + Опционален PDF Merge:**
+  - Документите си остават отделни файлове с чисти имена: индивидуално сваляне, масово сваляне като **ZIP архив** за качване в онлайн портали + чекбоксове с бутон **„Обедини избраните в 1 PDF“** само по избор.
+- [ ] **Ръчен Admin Панел `/vault` за Данни и Пароли:**
+  - Добавяне, преглед с 1-клик копиране (и линк към документа, ако има `source_document_id`), редакция и **100% физическо изтриване от навсякъде** (със Step-Up 4-цифрен ПИН за пароли).
 
 ---
 
-### 📋 Фаза 3: Личен AI Асистент `/chat`, Камера & Двуслоен Диспечер
-- [ ] Чат интерфейс с разделени сесии за двата родителски профила (UI на 🇧🇬 BG и 🇬🇷 EL).
-- [ ] Бутон 📷 Камера на телефон за моментален превод и разчитане на текст на място без задължителен запис в сейфа (+ бутон „📥 Запази в Архива“, ако е важен документ).
-- [ ] Гласова диктовка (Whisper Large V3) и говорещ отговор (TTS).
-- [ ] Слой 1: `jevRouter.ts` през OpenRouter `/api/alpha/decisions` (`typesafe/jev-*`) с таймаут `1500ms`.
-- [ ] Слой 2: `traditionalSupervisor.ts` с автоматично резервно превключване при грешка/таймаут на Jev.
-- [ ] Слой 3: Graceful Degradation съобщение при пълен срив на OpenRouter със запазване на 100% от не-AI функциите.
+### 📋 Фаза 3: Главен AI Бот (Jev Reranking) & Субагенти за Онлайн и PDF Бюрокрация
+- [ ] **Главен LangGraph Supervisor (`jevRouter.ts` + `traditionalSupervisor.ts` бекъп).**
+- [ ] **Двузоново търсене в Бота с Jev (`vaultSearchAndManageAgent.ts`):**
+  - Субагентът извлича кандидатите от базата ➔ **Jev (`/api/alpha/decisions`)** избира най-точните 1–2 попадения за **Зона 1** (спрямо описанието и времето, напр. *„дойде ми вчера нещо за Kinderzuschlag“*), а **Зона 2** отдолу показва всички останали сходни документи от най-нови към най-стари.
+  - Промяна и 100% изтриване на документи, факти и пароли директно през чата (с текст или снимка).
+- [ ] **Помощник за Немски Онлайн Портали и PDF Молби (`germanBureaucracyAgent.ts`):**
+  - **За онлайн портали (`Wohngeld`, `Kinderzuschlag` и др.):** Поставяш скрийншот (`Ctrl+V`) или копираш въпросите/списъка от сайта им ➔ ботът обяснява на български, вади твоите данни (`Steuer-ID`, `IBAN`, `Kaltmiete`) с бутон **Копирай** и подготвя нужните файлове (напр. за последните 6 месеца) за сваляне поотделно, като ZIP или обединени по твое желание.
+  - **За PDF формуляри и писма:** Разчита писма със срокове, води поле по поле по PDF молби и пише официални отговори / `Widerspruch` на перфектен немски.
 
 ---
 
-### 📋 Фаза 4: Първи Plug-and-Play Субагенти & Семеен Център `/family`
-- [ ] LangGraph координация с поддръжка на общо състояние `GraphState.collectedFacts` и таван `MAX_STEPS = 4`.
-- [ ] `archiveSearchAgent.ts` — хибридно търсене (100% точен SQL за извлечения + вектори за писма).
-- [ ] `germanAntragAgent.ts` — разчитане на немски молби и извличане на чеклист с нужни документи.
-- [ ] `archiveCleanupAgent.ts` — автоматично намиране на документи с изтекъл срок (`expires_at`) и безопасно изтриване след одобрение.
-- [ ] `shoppingListAgent.ts` — гласово и текстово управление на споделения списък за супермаркет.
-- [ ] Страница `/family` със синхронизиран в реално време списък за пазаруване.
-
----
-
-### 📋 Фаза 5: Онлайн Пазаруване, Фото Студио (Nano Banana) & Детски Учител
-- [ ] `shoppingWebAgent.ts` — търсене на реални оферти и цени в Amazon.de, Otto.de, Idealo.de (Tavily / Serper).
-- [ ] `imageStudioAgent.ts` — генерация и редакция на снимки с Google Nano Banana 2 & Pro (`google/gemini-3.1-flash-image` / `google/gemini-3-pro-image`) с интерактивни насочващи въпроси (стил, пропорция, запазване на лица).
-- [ ] `kidsTutorAgent.ts` — индивидуален учител за трите деца (знаещ класа и възрастта им) с опция за ПИН катинарче (Kids Lock) при предаване на устройството.
-
----
-
-### 📋 Фаза 6+: Финанси, Музикален DJ & GPS Уикенд
-- [ ] Страница `/finance` и `financeAdvisorAgent.ts` — месечен анализ на банковите извлечения (Kontoauszüge) и снимане на касови бележки (Kassenbons).
-- [ ] `youtubeDjAgent.ts` — търсене на песни през официалното YouTube Data API v3 и създаване на семейни плейлисти.
-- [ ] `localExplorerAgent.ts` — идеи за уикенда, времето (Open-Meteo) и събития по текущи GPS координати.
+## 🔮 След Пускане в Production
+Архитектурата е модулна (Supervisor + изолирани субагенти и `src/features/` домейни). След като системата влезе в реална ежедневна употреба в Production, към нея ще се планират и добавят следващи самостоятелни модули според конкретните ти приоритети в момента.

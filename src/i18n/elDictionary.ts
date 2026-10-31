@@ -2,42 +2,42 @@ import type { TranslationDictionary } from '@/i18n/bgDictionary';
 
 export const elDictionary: TranslationDictionary = {
   app: {
-    title: 'KRONOS — Προσωπικός & Οικογενειακός Βοηθός AI και Αρχείο',
+    title: 'KRONOS — Βοηθός AI, Αρχείο RAG Εγγράφων & Μνήμη',
     subtitle: 'Το σύστημα που εξοικονομεί χρόνο',
     languageLabel: 'Αλλαγή γλώσσας διεπαφής',
-    pinProtectedBadge: 'Προστασία με Τραπεζικό PIN 15 λεπτών',
+    pinProtectedBadge: 'Προστασία με 4-ψήφιο PIN',
   },
   nav: {
     mainAriaLabel: 'Κύρια πλοήγηση KRONOS',
     mobileAriaLabel: 'Κάτω πλοήγηση κινητού',
-    overview: 'Αρχική',
-    chat: 'AI Συνομιλία',
+    overview: 'Πίνακας',
+    chat: 'Βοηθός AI',
     documents: 'Έγγραφα',
-    finance: 'Οικονομικά',
-    family: 'Οικογένεια',
+    finance: 'Δεδομένα & Κωδικοί',
+    family: 'Αιτήσεις Online',
   },
   degradation: {
     aiUnavailableTitle: 'Οι υπηρεσίες AI είναι προσωρινά μη διαθέσιμες',
     aiUnavailableBody:
-      'Λόγω τεχνικών λόγων η σύνδεση με τα μοντέλα AI έχει διακοπεί προσωρινά. Η αναζήτηση εγγράφων, η προβολή, η λήψη, η εκτύπωση και η οικογενειακή λίστα αγορών λειτουργούν στο 100%.',
+      'Λόγω τεχνικών λόγων η σύνδεση με τα μοντέλα AI έχει διακοπεί προσωρινά. Η αναζήτηση εγγράφων, η προβολή, η λήψη ZIP και η διαχείριση δεδομένων/κωδικών λειτουργούν στο 100%.',
   },
   sections: {
-    overviewHeading: 'Καλώς ήρθατε στο KRONOS v4',
+    overviewHeading: 'Καλώς ήρθατε στο KRONOS',
     overviewDescription:
-      'Ενιαίο οικογενειακό θησαυροφυλάκιο εγγράφων, έξυπνος δρομολογητής AI (Jev + LangGraph) και οικογενειακό κέντρο.',
+      'Προσωπικό AI Bot και Admin RAG Αρχείο για έγγραφα (DE / BG / EL), κρυπτογραφημένους κωδικούς και βοήθεια με Wohngeld, Kinderzuschlag και online πύλες.',
     openModuleLabel: 'Άνοιγμα ενότητας',
-    chatTitle: 'Προσωπικός Βοηθός AI (/chat)',
+    chatTitle: 'Κύριος Βοηθός AI (/chat)',
     chatDescription:
-      'Καθημερινή συνομιλία για τα δύο προφίλ, άμεση μετάφραση με κάμερα και λειτουργία Δασκάλου με κλείδωμα PIN για τα τρία παιδιά.',
-    documentsTitle: 'Θησαυροφυλάκιο & Άμεση Αναζήτηση (/documents)',
+      'LangGraph Supervisor με αναζήτηση δύο ζωνών Jev, ανάλυση επιστολών/screenshots από online πύλες και διαχείριση δεδομένων.',
+    documentsTitle: 'Αρχείο RAG Εγγράφων (/documents)',
     documentsDescription:
-      'Μεταφόρτωση φωτογραφιών και PDF, μετατροπέας Φωτογραφιών σε PDF, αυτόματο OCR για Kontoauszüge και φίλτρα SQL.',
-    financeTitle: 'Οικονομικός Σύμβουλος (/finance)',
+      'Άμεση μαζική μεταφόρτωση Drag & Drop έως 50 MB χωρίς chat, άμεση αναζήτηση SQL + διανυσμάτων, λήψη μεμονωμένων/ZIP αρχείων και προαιρετική ένωση PDF.',
+    financeTitle: 'Δεδομένα & Κωδικοί',
     financeDescription:
-      'Μηνιαία ανάλυση τραπεζικών κινήσεων (Kontoauszüge) και γρήγορη καταγραφή πληρωμών μετρητών από αποδείξεις.',
-    familyTitle: 'Οικογενειακό Κέντρο (/family)',
+      'Αποθηκευμένα στοιχεία (Steuer-ID, IBAN με αντιγραφή 1-κλικ και αναφορά στο έγγραφο) και κρυπτογραφημένοι κωδικοί AES-256-GCM με PIN.',
+    familyTitle: 'Προετοιμασία Online Αιτήσεων',
     familyDescription:
-      'Κοινόχρηστη λίστα αγορών σε πραγματικό χρόνο, προφίλ των παιδιών για τον Δάσκαλο και αποθηκευμένες λίστες μουσικής.',
-    phaseReadyBadge: 'Φάση 0 — Ο πυρήνας και η ασφάλεια είναι ενεργά',
+      'Γρήγορη εύρεση εγγράφων τελευταίων 3–6 μηνών ως ξεχωριστά αρχεία για online πύλες ή καθοδήγηση βήμα προς βήμα σε αιτήσεις PDF.',
+    phaseReadyBadge: 'KRONOS — Ο πυρήνας και η ασφάλεια είναι ενεργά',
   },
 };

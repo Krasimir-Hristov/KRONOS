@@ -1,9 +1,10 @@
 import type { MetadataRoute } from 'next';
 
 const manifest = (): MetadataRoute.Manifest => ({
-  name: 'KRONOS — Семеен AI Асистент & Архив',
+  name: 'KRONOS — AI Асистент & Документен Сейф',
   short_name: 'KRONOS',
-  description: 'Личен и семеен AI асистент, документен сейф и финансов съветник.',
+  description:
+    'Личен модулен AI асистент, документен сейф (DE/BG/EL) и криптирана памет за данни и пароли.',
   start_url: '/',
   display: 'standalone',
   background_color: '#020617',
