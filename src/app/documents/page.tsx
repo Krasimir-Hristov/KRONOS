@@ -3,9 +3,9 @@ import type { Metadata } from 'next';
 import { ModuleStageCard } from '@/components/layout/ModuleStageCard';
 
 export const metadata: Metadata = {
-  title: 'Документен Сейф & Търсачка',
+  title: 'Документен RAG Сейф & Търсачка',
   description:
-    'Сигурно съхранение на PDF и снимки в Cloudflare R2, OCR анализ и мигновено SQL търсене.',
+    'Сигурно съхранение на PDF и снимки до 50 MB в частен Supabase Storage сейф, OCR анализ и мигновено търсене.',
 };
 
 const DocumentsPage: React.FC = () => {

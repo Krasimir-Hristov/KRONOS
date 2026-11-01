@@ -12,10 +12,7 @@ const serverEnvSchema = publicEnvSchema.extend({
   KRONOS_VAULT_ENCRYPTION_KEY: z.string().min(32).optional(),
   CRON_SECRET: z.string().min(32).optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
-  R2_ACCOUNT_ID: z.string().min(1).optional(),
-  R2_ACCESS_KEY_ID: z.string().min(1).optional(),
-  R2_SECRET_ACCESS_KEY: z.string().min(1).optional(),
-  R2_BUCKET_NAME: z.string().min(1).default('kronos-vault'),
+  SUPABASE_STORAGE_BUCKET: z.string().min(1).default('kronos-vault'),
   OPENROUTER_API_KEY: z.string().min(1).optional(),
 });
 

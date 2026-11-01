@@ -1,17 +1,17 @@
 ---
 name: kronos-db-migration
 description: >-
-  Design, update, and migrate the KRONOS PostgreSQL + pgvector database schema using
-  pure Supabase SQL migrations, Supabase MCP, and @supabase/supabase-js. Activate when
-  creating or modifying tables, indexes, pgvector embeddings, Full-Text Search,
-  vault_items encryption columns, Row-Level Security (RLS), or cron jobs.
+  Design, update, and migrate the KRONOS PostgreSQL + pgvector database schema and
+  Supabase Storage buckets using pure Supabase SQL migrations, Supabase MCP, and
+  @supabase/supabase-js. Activate when creating or modifying tables, indexes, pgvector
+  embeddings, Full-Text Search, vault_items encryption columns, Storage RLS, or cron jobs.
 ---
 
-# KRONOS Database & Supabase Migration Runbook
+# KRONOS Database & Supabase Storage Migration Runbook
 
-KRONOS uses **pure Supabase SQL migrations** (`supabase/migrations/*.sql`) and **Supabase MCP** (`apply_migration` + `generate_typescript_types`) with `@supabase/supabase-js` and `@supabase/ssr` — **no Drizzle ORM and no Prisma ORM**.
+KRONOS uses **pure Supabase SQL migrations** (`supabase/migrations/*.sql`) and **Supabase MCP** (`apply_migration` + `generate_typescript_types`) with `@supabase/supabase-js` and `@supabase/ssr` — **no Drizzle ORM, no Prisma ORM, and no external storage SDKs**.
 
-## Core Schema Rules
+## Core Schema & Storage Rules
 
 1. **Generated Types as Single Source of Truth**:
    - Store SQL migrations cleanly in `supabase/migrations/`.
@@ -27,10 +27,12 @@ KRONOS uses **pure Supabase SQL migrations** (`supabase/migrations/*.sql`) and *
    - Maintain both `doc_date` (date printed on the document) and `created_at` (upload timestamp) with B-Tree indexes, plus `expires_at` index.
    - Enable `pg_trgm` and add a `GIN` Full-Text index using `'simple'` configuration plus trigram indexes on `title`, `topic`, and `sender`.
 
-4. **Vault Facts, Encrypted Secrets & Hard Purge Everywhere**:
+4. **Supabase Storage (`kronos-vault`), Encrypted Secrets & Hard Purge Everywhere**:
+   - Create a private Supabase Storage bucket `kronos-vault` (`public = false`, `file_size_limit = 52428800` for `50 MB`) with strict `storage.objects` RLS policies scoped to `auth.uid()`.
+   - Store the object path in `documents.storage_path`.
    - In `vault_items`, preserve `source_document_id` (`REFERENCES public.documents(id) ON DELETE SET NULL`) so extracted facts like `Steuer-ID` link directly to their source document when uploaded, or stay `null` when provided directly without a document.
    - Passwords and secrets (`is_secret = true`) MUST store ciphertext in `value_encrypted` (`AES-256-GCM`) with `value_plain = NULL`, and MUST NEVER be embedded into vector columns.
-   - Deleting a document MUST physically delete both the **Cloudflare R2** object and the **Supabase** row + vectors (`Hard Purge Everywhere`).
+   - Deleting a document MUST physically delete both the **Supabase Storage** object (`kronos-vault`) and the **Supabase PostgreSQL** row + vectors (`Hard Purge Everywhere`).
    - Enable Row-Level Security (RLS) on **every** public table immediately upon creation.
 
 ## Migration & Verification Steps

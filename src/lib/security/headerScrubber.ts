@@ -4,7 +4,7 @@
  * Strips all external `x-*` headers (including `x-middleware-subrequest`,
  * `x-middleware-*`, `x-invoke-*`, `x-prerender-*`) while preserving only
  * trusted reverse-proxy headers required by Next.js 16 Server Actions CSRF
- * origin verification behind Vercel / Cloudflare.
+ * origin verification on Vercel.
  */
 
 const ALLOWED_PROXY_X_HEADERS = new Set<string>([

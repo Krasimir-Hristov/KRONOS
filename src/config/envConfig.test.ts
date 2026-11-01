@@ -14,7 +14,7 @@ describe('envConfig & aiModelsConfig', () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.data.NEXT_PUBLIC_APP_URL).toBe('http://localhost:3000');
-      expect(result.data.R2_BUCKET_NAME).toBe('kronos-vault');
+      expect(result.data.SUPABASE_STORAGE_BUCKET).toBe('kronos-vault');
     }
   });
 

@@ -13,7 +13,7 @@
 ### Основни Функционални Закони на Системата
 
 1. **Директно Масово Пълнене на RAG Сейфа (Без нужда от Чат-бота) + Качване през Бота:**
-   - Потребителят може да пълни RAG базата **директно през Admin страниците** (`/documents` и `/vault`), без изобщо да пише на бота — включително чрез **Масово Drag & Drop качване на 10–20+ файла наведнъж** (договори, актове за раждане/брак на DE, BG и EL, писма от институции, месечни `Kontoauszüge`), както и снимане на многостранични хартиени писма от телефон (обединявани в PDF до `50 MB` в Cloudflare R2).
+   - Потребителят може да пълни RAG базата **директно през Admin страниците** (`/documents` и `/vault`), без изобщо да пише на бота — включително чрез **Масово Drag & Drop качване на 10–20+ файла наведнъж** (договори, актове за раждане/брак на DE, BG и EL, писма от институции, месечни `Kontoauszüge`), както и снимане на многостранични хартиени писма от телефон (обединявани в PDF до `50 MB` в частния bucket `kronos-vault` на **Supabase Storage**).
    - При масово качване опашката обработва файловете автоматично (OCR + RAG вектори + предложено ясно заглавие, оригинална тема/служба, `doc_date` и открити факти като `Steuer-ID` / `IBAN`) и ги показва в списък с бутон **„Одобри всички“** или бърза редакция на отделен ред.
 2. **Двузоново Умно Търсене (Разделение между Сейф и Чат-бот):**
    - **В страницата `/documents` (Ръчна търсачка):** Използва бърз класически **SQL + Full-Text + векторен поиск** (`0 €`, мигновен и независим от външни AI сривове).
@@ -28,17 +28,19 @@
    - **Помощ за онлайн форми и PDF молби (`Antrag`):** При поставен скрийншот (`Ctrl+V`) или текст от немски онлайн портал (както и при качен PDF формуляр или писмо от служба), агентът обяснява на прост български какво се иска и какъв е срокът, подава готовите лични данни от `vault_items` за копиране, намира нужните прикачени файлове от сейфа и пише официални отговори / `Widerspruch` на перфектен немски.
 5. **Двупосочно Управление (Бот + Ръчен Admin UI) & 100% Изтриване от Навсякъде (`Hard Purge`):**
    - Всеки документ, факт или парола може да се добавя, променя (вкл. по текст или снимка към бота) и изтрива както през **главния AI Бот**, така и **ръчно през Admin Dashboard секциите**.
-   - **Железен закон при изтриване:** Когато елемент бъде изтрит от едно място (през бота или ръчно), той се изтрива **физически и безвъзвратно от абсолютно навсякъде** — обектът от Cloudflare R2, редът, OCR текстът и векторите от Supabase, плюс кешът на екрана.
-6. **Модулна Мащабируемост след Production:**
+   - **Железен закон при изтриване:** Когато елемент бъде изтрит от едно място (през бота или ръчно), той се изтрива **физически и безвъзвратно от абсолютно навсякъде** — физическият файл от **Supabase Storage (`kronos-vault`)**, редът, OCR текстът и векторите от **Supabase PostgreSQL**, плюс кешът на екрана.
+6. **Модулна Мащабируемост след Production (вкл. Сменяем Сторидж Адаптер):**
    - Гръбнакът (LangGraph Supervisor + Jev + изолирани `src/features/` модули) е проектиран така, че **след** като текущата документна система влезе в Production и се използва ежедневно, да може плавно да се надгражда с нови независими модули според реалните нужди на автора.
+   - Файловият слой е изолиран в `src/features/storage/dal/storageDal.ts` — започваме на 100% със **Supabase Storage** (`1 GB` безплатно без нужда от банкова карта, до `50 MB`/файл), а само ако в бъдеще обемът се запълни, преминаването към друг сторидж (като Cloudflare R2) става с промяна единствено в този изолиран DAL модул.
 
 ---
 
 ## 2. Технологичен Стек (Чист, Лек и Без Излишни Библиотеки)
 
 - **Framework & UI:** Next.js 16 (App Router, React 19, TypeScript strict, Tailwind CSS v4), TanStack Query v5, `next-intl` за езици.
-- **База данни & Вход:** Чист **Supabase SDK** (`@supabase/supabase-js` + `@supabase/ssr`) + автоматично генерирани TypeScript типове през **Supabase MCP** (`src/types/databaseTypes.ts`). **Без Drizzle ORM и без Prisma ORM!**
-- **Файлов Сейф:** **Cloudflare R2** (до `50 MB` на файл, `10 GB` безплатен обем) чрез леката 4 KB библиотека **`aws4fetch`** (S3 Presigned PUT/GET/DELETE URLs, заобикалящи 4.5 MB лимита на Vercel). **Без тежкия AWS SDK!**
+- **База данни, Вход & Файлов Сейф (Всичко в Supabase):** Чист **Supabase SDK** (`@supabase/supabase-js` + `@supabase/ssr`) + автоматично генерирани TypeScript типове през **Supabase MCP** (`src/types/databaseTypes.ts`):
+  - **PostgreSQL + `pgvector(1536)` + Full-Text Search + RLS** (без Drizzle ORM и без Prisma ORM!).
+  - **Supabase Storage (`kronos-vault`)** — частен bucket с RLS защита и директни подписани URL-и (`createSignedUploadUrl` / `createSignedUrl` до `50 MB` на файл, заобикалящи 4.5 MB лимита на Vercel — без допълнителни сторидж регистрации и без S3/AWS пакети!).
 - **AI Оркестрация:** Единствено **OpenRouter API** + **LangChain & LangGraph** (`@langchain/core`, `@langchain/langgraph`, `@langchain/openai`) + `typesafe/jev` Decisions API (`/api/alpha/decisions`).
 
 ---
@@ -48,13 +50,13 @@
 > **Override над глобални конвенции:** В хранилището `kronos` конвенцията `camelCase.ts` / `PascalCase.tsx` и задължителните Vitest unit тестове имат изричен приоритет пред всякакви глобални `kebab-case` или `no-unit-tests` правила.
 
 1. **`camelCase` за спомагателни файлове и функции (`camelCase.ts`):**
-   - Всички спомагателни функции, агенти, рутери, DAL модули, Zod схеми, hooks, криптография и техните тестове (`camelCase.test.ts`) **ВИНАГИ** използват `camelCase` — както за имената на файловете (`jevRouter.ts`, `documentDal.ts`, `headerScrubber.ts`), така и за самите функции вътре. Публичният експорт на всеки feature модул е `index.ts`.
+   - Всички спомагателни функции, агенти, рутери, DAL модули, Zod схеми, hooks, криптография и техните тестове (`camelCase.test.ts`) **ВИНАГИ** използват `camelCase` — както за имената на файловете (`jevRouter.ts`, `documentDal.ts`, `storageDal.ts`, `headerScrubber.ts`), така и за самите функции вътре. Публичният експорт на всеки feature модул е `index.ts`.
 2. **`PascalCase` и Arrow Functions за React Компоненти (`PascalCase.tsx`):**
    - Всички React компоненти **ВИНАГИ** носят имена в `PascalCase.tsx` (`DocumentViewer.tsx`, `AppShell.tsx`, `PinPadScreen.tsx`).
    - Всеки React компонент **ВИНАГИ** се дефинира като **Arrow Function** (`export const MyComponent: React.FC<Props> = () => { ... }`). Ключовата дума `function` за дефиниране на компоненти е строго забранена.
 3. **Единствени разрешени системни изключения:** Маршрутните файлове на Next.js 16 в `src/app/` (`page.tsx`, `layout.tsx`, `loading.tsx`, `error.tsx`, `not-found.tsx`, `route.ts`, `manifest.ts`), `src/proxy.ts` и `.agents/skills/<skill-name>/SKILL.md`.
 4. **Твърд лимит от 250–300 реда на файл:** Нито един файл в `src/` не може да надвишава **300 реда** (проверява се автоматично от `pnpm verify:arch`). При достигане на 250 реда файлът се разделя на малки модули.
-5. **Feature изолация и DAL:** Всеки домейн живее в `src/features/<featureName>/` и се импортира отвън **единствено** през `@/features/<featureName>` (`index.ts`). Всички заявки към Supabase и Cloudflare R2 са изолирани в `dal/` със `server-only`.
+5. **Feature изолация и DAL:** Всеки домейн живее в `src/features/<featureName>/` и се импортира отвън **единствено** през `@/features/<featureName>` (`index.ts`). Всички заявки към Supabase Database и Supabase Storage са изолирани в `dal/` със `server-only`.
 6. **Семантичен HTML, A11y & Tailwind v4:** Използвай `<main>`, `<nav>`, `<section>`, `<article>`, `<header>`, `<aside>`, задължителен `aria-label` на интерактивни елементи, уникални `Metadata` на всяка страница и новия градиентен синтаксис `bg-linear-to-*` (`bg-gradient-to-*` е забранен).
 
 ---
@@ -66,7 +68,7 @@
 3. **Next.js 16 Security First (`src/proxy.ts` + Двоен Вход с 4-Цифрен ПИН):**
    - Абсолютна забрана за `middleware.ts`. Мрежовият периметър е `src/proxy.ts` с Allowlist Header Scrubbing срещу CVE-2025-29927 (запазвайки само `x-forwarded-host`, `x-forwarded-proto`, `x-forwarded-for`, `x-real-ip` за Server Actions CSRF защитата).
    - Достъпът изисква **Supabase Auth сесия (`Email + Парола`)** плюс верифициран **4-цифрен ПИН код** (криптиран `HttpOnly` cookie с 15-минутен sliding TTL + Step-Up ПИН потвърждение за пароли). Всеки DAL метод и Server Action дублира тази проверка чрез `requireAuthAndPin()`.
-4. **Graceful Degradation:** Ако Jev (`/api/alpha/decisions`, таймаут `1.5s`) прекъсне, системата автоматично минава към `traditionalSupervisor.ts` в OpenRouter. Ако целият OpenRouter е временно недостъпен, потребителят вижда ясно съобщение, докато целият не-AI слой (SQL/Full-Text търсене в `/documents`, преглед/сваляне/ZIP от R2 и ръчно управление на данни/пароли) работи на **100%**.
+4. **Graceful Degradation:** Ако Jev (`/api/alpha/decisions`, таймаут `1.5s`) прекъсне, системата автоматично минава към `traditionalSupervisor.ts` в OpenRouter. Ако целият OpenRouter е временно недостъпен, потребителят вижда ясно съобщение, докато целият не-AI слой (SQL/Full-Text търсене в `/documents`, преглед/сваляне/ZIP от Supabase Storage и ръчно управление на данни/пароли) работи на **100%**.
 
 ---
 

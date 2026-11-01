@@ -12,7 +12,7 @@ description: >-
 KRONOS uses **OpenRouter exclusively** orchestrated by **LangChain + LangGraph** (`@langchain/core`, `@langchain/langgraph`, `@langchain/openai`) with 3-tier resilience:
 1. **Tier 1 (`jevRouter.ts`)**: Calls `POST https://openrouter.ai/api/alpha/decisions` (`typesafe/jev-*`) with `AbortSignal.timeout(1500)` using `noul`, `choice`, and `score` primitives.
 2. **Tier 2 (`traditionalSupervisor.ts`)**: Automatic fallback in `catch` using classic tool-calling (`bindTools`) on OpenRouter if Jev times out or errors.
-3. **Tier 3 (Graceful Degradation)**: If OpenRouter itself is unreachable, return `{ ok: false, errorCode: 'AI_UNAVAILABLE' }` so the UI shows a clean notice while manual SQL/FTS search in `/documents`, Cloudflare R2 viewing/ZIP downloads, and manual `/vault` management stay 100% operational.
+3. **Tier 3 (Graceful Degradation)**: If OpenRouter itself is unreachable, return `{ ok: false, errorCode: 'AI_UNAVAILABLE' }` so the UI shows a clean notice while manual SQL/FTS search in `/documents`, Supabase Storage viewing/ZIP downloads, and manual `/vault` management stay 100% operational.
 
 ## Two-Tier Chat Search with Jev Reranking
 
