@@ -116,10 +116,19 @@ for (const absPath of srcFiles) {
     const importedFeature = match[1];
     const importedSubpath = match[2];
     const ownFeaturePrefix = `src/features/${importedFeature}/`;
-    if (!relPath.startsWith(ownFeaturePrefix) && importedSubpath !== 'index' && importedSubpath !== 'server') {
-      errors.push(
-        `[FEATURE-BOUNDARY] ${relPath} deep-imports '@/features/${importedFeature}/${importedSubpath}'. Import from '@/features/${importedFeature}' or '@/features/${importedFeature}/server' only.`
-      );
+    if (!relPath.startsWith(ownFeaturePrefix)) {
+      if (importedSubpath === 'server') {
+        const serverEntryPoint = path.join(ROOT_DIR, 'src', 'features', importedFeature, 'server.ts');
+        if (!fs.existsSync(serverEntryPoint)) {
+          errors.push(
+            `[FEATURE-BOUNDARY] ${relPath} imports '@/features/${importedFeature}/server', but ${importedFeature} does not have a server.ts entry point.`
+          );
+        }
+      } else if (importedSubpath !== 'index') {
+        errors.push(
+          `[FEATURE-BOUNDARY] ${relPath} deep-imports '@/features/${importedFeature}/${importedSubpath}'. Import from '@/features/${importedFeature}' (or server.ts if available) only.`
+        );
+      }
     }
   }
 }

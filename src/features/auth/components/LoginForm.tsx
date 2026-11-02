@@ -17,13 +17,17 @@ export const LoginForm: React.FC = () => {
     setErrorMessage(null);
 
     startTransition(async () => {
-      const result = await signInAction({ email, password });
-      if (!result.ok) {
-        setErrorMessage(result.errorMessage);
-        return;
+      try {
+        const result = await signInAction({ email, password });
+        if (!result.ok) {
+          setErrorMessage(result.errorMessage);
+          return;
+        }
+        router.push('/pin');
+        router.refresh();
+      } catch {
+        setErrorMessage('Проблем с мрежовата връзка. Моля, опитайте отново.');
       }
-      router.push('/pin');
-      router.refresh();
     });
   };
 

@@ -85,6 +85,19 @@ create trigger set_profiles_updated_at
   before update on public.profiles
   for each row execute function private.set_updated_at();
 
+-- Backfill existing auth.users into public.profiles (idempotent)
+insert into public.profiles (id, email, display_name)
+select
+  id,
+  coalesce(email, ''),
+  coalesce(
+    raw_user_meta_data->>'full_name',
+    raw_user_meta_data->>'display_name',
+    split_part(coalesce(email, ''), '@', 1)
+  )
+from auth.users
+on conflict (id) do nothing;
+
 -- 4. DOCUMENTS TABLE
 create table if not exists public.documents (
   id uuid primary key default gen_random_uuid(),

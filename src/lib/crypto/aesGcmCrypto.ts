@@ -48,7 +48,7 @@ export const decryptAesGcm = (
     const tagHex = parts[2];
     const cipherHex = parts[3];
 
-    if (!ivHex || !tagHex || !cipherHex) {
+    if (!ivHex || !tagHex || cipherHex === undefined) {
       return null;
     }
 

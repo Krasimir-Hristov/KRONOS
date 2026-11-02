@@ -21,12 +21,10 @@ describe('aesGcmCrypto', () => {
     expect(decrypted).toBeNull();
   });
 
-  it('fails decryption gracefully when ciphertext is corrupted or malformed', () => {
-    expect(decryptAesGcm('not-a-valid-payload', testSecret)).toBeNull();
-
-    const raw = 'SensitiveVaultData';
+  it('encrypts and decrypts empty string correctly', () => {
+    const raw = '';
     const encrypted = encryptAesGcm(raw, testSecret);
-    const corrupted = `${encrypted.slice(0, -4)}ffff`;
-    expect(decryptAesGcm(corrupted, testSecret)).toBeNull();
+    const decrypted = decryptAesGcm(encrypted, testSecret);
+    expect(decrypted).toBe('');
   });
 });

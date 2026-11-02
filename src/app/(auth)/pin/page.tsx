@@ -2,6 +2,7 @@ import React from 'react';
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { PinPadScreen } from '@/features/auth';
+import { getUserPinStatus } from '@/features/auth/server';
 import { createServerSupabaseClient } from '@/lib/supabase/supabaseServer';
 
 export const metadata: Metadata = {
@@ -19,15 +20,20 @@ const PinPage: React.FC = async () => {
     redirect('/login');
   }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('pin_hash')
-    .eq('id', user.id)
-    .single();
+  const status = await getUserPinStatus(user.id);
 
-  const hasPin = Boolean(profile?.pin_hash);
+  if (status.isError) {
+    return (
+      <div className="w-full max-w-sm mx-auto p-6 text-center rounded-3xl border border-rose-500/30 bg-rose-950/20 text-rose-300">
+        <h1 className="text-lg font-bold mb-2">Грешка при зареждане</h1>
+        <p className="text-sm">
+          {status.errorMessage ?? 'Неуспешна проверка на ПИН профила. Моля, опитайте отново по-късно.'}
+        </p>
+      </div>
+    );
+  }
 
-  return <PinPadScreen initialHasPin={hasPin} />;
+  return <PinPadScreen initialHasPin={status.hasPin} />;
 };
 
 export default PinPage;

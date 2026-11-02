@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { parseServerEnv } from '@/config/envConfig';
+import {
+  getCryptoSecrets,
+  getSupabaseConfig,
+  parseServerEnv,
+} from '@/config/envConfig';
 import {
   EMBEDDING_DIMENSIONS,
   getAiModelsConfig,
@@ -47,5 +51,21 @@ describe('envConfig & aiModelsConfig', () => {
       OPENROUTER_JEV_MODEL: 'typesafe/jev-1.14',
     });
     expect(overridden.jevDispatcher).toBe('typesafe/jev-1.14');
+  });
+
+  it('throws an error when required Supabase config or crypto secrets are missing', () => {
+    const originalUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+    expect(() => getSupabaseConfig()).toThrowError(/NEXT_PUBLIC_SUPABASE_URL/);
+
+    if (originalUrl) process.env.NEXT_PUBLIC_SUPABASE_URL = originalUrl;
+
+    const originalPin = process.env.KRONOS_PIN_SECRET;
+    delete process.env.KRONOS_PIN_SECRET;
+
+    expect(() => getCryptoSecrets()).toThrowError(/KRONOS_PIN_SECRET/);
+
+    if (originalPin) process.env.KRONOS_PIN_SECRET = originalPin;
   });
 });

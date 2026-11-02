@@ -8,6 +8,24 @@ export const PIN_COOKIE_NAME = 'kronos_pin_verified' as const;
 export const STEP_UP_PIN_COOKIE_NAME = 'kronos_vault_unlocked' as const;
 const PIN_TTL_SECONDS = 15 * 60;
 
+const applySecurityHeaders = (res: NextResponse): NextResponse => {
+  res.headers.set('X-Content-Type-Options', 'nosniff');
+  res.headers.set('X-Frame-Options', 'DENY');
+  res.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  return res;
+};
+
+const createRedirectWithCookies = (
+  url: URL,
+  sourceResponse: NextResponse
+): NextResponse => {
+  const redirectRes = NextResponse.redirect(url);
+  sourceResponse.cookies.getAll().forEach((cookie) => {
+    redirectRes.cookies.set(cookie.name, cookie.value, cookie);
+  });
+  return applySecurityHeaders(redirectRes);
+};
+
 const isPublicRoute = (pathname: string): boolean => {
   if (
     pathname === '/login' ||
@@ -32,9 +50,7 @@ export const proxy = async (request: NextRequest): Promise<NextResponse> => {
       },
     });
 
-    response.headers.set('X-Content-Type-Options', 'nosniff');
-    response.headers.set('X-Frame-Options', 'DENY');
-    response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+    applySecurityHeaders(response);
 
     if (isPublicRoute(pathname) && pathname !== '/login') {
       return response;
@@ -55,6 +71,7 @@ export const proxy = async (request: NextRequest): Promise<NextResponse> => {
               headers: scrubbedHeaders,
             },
           });
+          applySecurityHeaders(response);
           cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options)
           );
@@ -70,7 +87,7 @@ export const proxy = async (request: NextRequest): Promise<NextResponse> => {
     if (!user) {
       if (pathname !== '/login') {
         const loginUrl = new URL('/login', request.url);
-        return NextResponse.redirect(loginUrl);
+        return createRedirectWithCookies(loginUrl, response);
       }
       return response;
     }
@@ -81,15 +98,15 @@ export const proxy = async (request: NextRequest): Promise<NextResponse> => {
     if (!pinCookie) {
       if (pathname !== '/pin') {
         const pinUrl = new URL('/pin', request.url);
-        return NextResponse.redirect(pinUrl);
+        return createRedirectWithCookies(pinUrl, response);
       }
       return response;
     }
 
-    // 3. User is authenticated and PIN cookie is present: redirect away from auth pages
-    if (pathname === '/login' || pathname === '/pin') {
+    // 3. User is authenticated and PIN cookie is present: redirect away from login
+    if (pathname === '/login') {
       const homeUrl = new URL('/', request.url);
-      return NextResponse.redirect(homeUrl);
+      return createRedirectWithCookies(homeUrl, response);
     }
 
     // 4. Sliding PIN TTL on active navigation

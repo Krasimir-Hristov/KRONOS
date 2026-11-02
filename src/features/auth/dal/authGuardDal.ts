@@ -13,6 +13,42 @@ export interface VerifiedAuthContext {
   readonly profile: ProfileRow;
 }
 
+export interface UserPinStatus {
+  readonly hasPin: boolean;
+  readonly isError: boolean;
+  readonly errorMessage?: string;
+}
+
+export const getUserPinStatus = async (userId: string): Promise<UserPinStatus> => {
+  try {
+    const supabase = await createServerSupabaseClient();
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('pin_hash')
+      .eq('id', userId)
+      .single();
+
+    if (error || !profile) {
+      return {
+        hasPin: false,
+        isError: true,
+        errorMessage: 'Грешка при зареждане на потребителския профил.',
+      };
+    }
+
+    return {
+      hasPin: Boolean(profile.pin_hash),
+      isError: false,
+    };
+  } catch {
+    return {
+      hasPin: false,
+      isError: true,
+      errorMessage: 'Неочаквана грешка при проверка на ПИН статуса.',
+    };
+  }
+};
+
 export const requireAuthAndPin = async (
   options: { readonly redirectOnFail?: boolean } = { redirectOnFail: true }
 ): Promise<VerifiedAuthContext> => {
