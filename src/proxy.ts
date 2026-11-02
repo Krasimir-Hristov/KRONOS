@@ -1,12 +1,17 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { scrubExternalHeaders } from '@/lib/security/headerScrubber';
-import { getSupabaseConfig } from '@/config/envConfig';
+import { getCryptoSecrets, getSupabaseConfig } from '@/config/envConfig';
+import {
+  createEncryptedPinCookie,
+  verifyEncryptedPinCookie,
+} from '@/features/auth/server';
 import type { Database } from '@/types/databaseTypes';
 
 export const PIN_COOKIE_NAME = 'kronos_pin_verified' as const;
 export const STEP_UP_PIN_COOKIE_NAME = 'kronos_vault_unlocked' as const;
-const PIN_TTL_SECONDS = 15 * 60;
+const PIN_TTL_MINUTES = 15;
+const PIN_TTL_SECONDS = PIN_TTL_MINUTES * 60;
 
 const applySecurityHeaders = (res: NextResponse): NextResponse => {
   res.headers.set('X-Content-Type-Options', 'nosniff');
@@ -92,10 +97,12 @@ export const proxy = async (request: NextRequest): Promise<NextResponse> => {
       return response;
     }
 
-    // 2. Check 4-digit PIN verification cookie presence at perimeter
+    // 2. Check 4-digit PIN verification cookie presence and cryptographic validity
     const pinCookie = request.cookies.get(PIN_COOKIE_NAME)?.value;
+    const { pinSecret } = getCryptoSecrets();
+    const isPinValid = verifyEncryptedPinCookie(pinCookie, user.id, pinSecret);
 
-    if (!pinCookie) {
+    if (!isPinValid) {
       if (pathname !== '/pin') {
         const pinUrl = new URL('/pin', request.url);
         return createRedirectWithCookies(pinUrl, response);
@@ -103,14 +110,19 @@ export const proxy = async (request: NextRequest): Promise<NextResponse> => {
       return response;
     }
 
-    // 3. User is authenticated and PIN cookie is present: redirect away from login
-    if (pathname === '/login') {
+    // 3. User is authenticated and PIN cookie is cryptographically valid: redirect away from auth pages
+    if (pathname === '/login' || pathname === '/pin') {
       const homeUrl = new URL('/', request.url);
       return createRedirectWithCookies(homeUrl, response);
     }
 
-    // 4. Sliding PIN TTL on active navigation
-    response.cookies.set(PIN_COOKIE_NAME, pinCookie, {
+    // 4. Sliding PIN TTL on active navigation: regenerate cookie with refreshed payload.exp
+    const refreshedCookie = createEncryptedPinCookie(
+      user.id,
+      PIN_TTL_MINUTES,
+      pinSecret
+    );
+    response.cookies.set(PIN_COOKIE_NAME, refreshedCookie, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',

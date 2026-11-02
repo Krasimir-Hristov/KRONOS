@@ -75,10 +75,17 @@ export const getSupabaseConfig = () => {
     );
   }
 
+  const parsedUrl = z.string().url().safeParse(url);
+  if (!parsedUrl.success) {
+    throw new Error(
+      'Невалиден URL адрес за NEXT_PUBLIC_SUPABASE_URL в .env конфигурацията.'
+    );
+  }
+
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const storageBucket = process.env.SUPABASE_STORAGE_BUCKET ?? 'kronos-vault';
 
-  return { url, publishableKey, serviceRoleKey, storageBucket };
+  return { url: parsedUrl.data, publishableKey, serviceRoleKey, storageBucket };
 };
 
 export const getCryptoSecrets = () => {

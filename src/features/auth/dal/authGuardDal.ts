@@ -13,10 +13,12 @@ export interface VerifiedAuthContext {
   readonly profile: ProfileRow;
 }
 
+export type PinStatusErrorCode = 'PROFILE_LOAD_FAILED' | 'UNEXPECTED_ERROR';
+
 export interface UserPinStatus {
   readonly hasPin: boolean;
   readonly isError: boolean;
-  readonly errorMessage?: string;
+  readonly errorCode?: PinStatusErrorCode;
 }
 
 export const getUserPinStatus = async (userId: string): Promise<UserPinStatus> => {
@@ -32,7 +34,7 @@ export const getUserPinStatus = async (userId: string): Promise<UserPinStatus> =
       return {
         hasPin: false,
         isError: true,
-        errorMessage: 'Грешка при зареждане на потребителския профил.',
+        errorCode: 'PROFILE_LOAD_FAILED',
       };
     }
 
@@ -44,7 +46,7 @@ export const getUserPinStatus = async (userId: string): Promise<UserPinStatus> =
     return {
       hasPin: false,
       isError: true,
-      errorMessage: 'Неочаквана грешка при проверка на ПИН статуса.',
+      errorCode: 'UNEXPECTED_ERROR',
     };
   }
 };
