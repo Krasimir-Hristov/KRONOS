@@ -116,9 +116,9 @@ for (const absPath of srcFiles) {
     const importedFeature = match[1];
     const importedSubpath = match[2];
     const ownFeaturePrefix = `src/features/${importedFeature}/`;
-    if (!relPath.startsWith(ownFeaturePrefix) && importedSubpath !== 'index') {
+    if (!relPath.startsWith(ownFeaturePrefix) && importedSubpath !== 'index' && importedSubpath !== 'server') {
       errors.push(
-        `[FEATURE-BOUNDARY] ${relPath} deep-imports '@/features/${importedFeature}/${importedSubpath}'. Import from '@/features/${importedFeature}' (index.ts) only.`
+        `[FEATURE-BOUNDARY] ${relPath} deep-imports '@/features/${importedFeature}/${importedSubpath}'. Import from '@/features/${importedFeature}' or '@/features/${importedFeature}/server' only.`
       );
     }
   }

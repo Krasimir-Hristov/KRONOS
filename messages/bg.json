@@ -1,0 +1,66 @@
+{
+  "app": {
+    "title": "KRONOS",
+    "subtitle": "Личен AI Асистент & Документен RAG Сейф",
+    "pinProtected": "Банкова защита с 4-цифрен ПИН",
+    "lockPin": "Заключи ПИН",
+    "signOut": "Изход",
+    "language": "Български"
+  },
+  "nav": {
+    "overview": "Табло",
+    "chat": "AI Асистент",
+    "documents": "Документен Сейф",
+    "vault": "Данни & Пароли",
+    "mainMenu": "Главно меню",
+    "mobileMenu": "Мобилна навигация"
+  },
+  "auth": {
+    "loginTitle": "Вход в KRONOS",
+    "loginSubtitle": "Въведете вашия имейл и парола за достъп до личната система.",
+    "emailLabel": "Имейл адрес",
+    "passwordLabel": "Парола",
+    "loginButton": "Влез в KRONOS",
+    "loggingIn": "Влизане...",
+    "invalidCredentials": "Невалиден имейл или парола.",
+    "unexpectedError": "Възникна неочаквана грешка при входа.",
+    "pinTitle": "4-Цифрен ПИН Код",
+    "pinSetupTitle": "Създайте вашия 4-цифрен ПИН",
+    "pinSubtitle": "Въведете 4-цифрен ПИН за отключване на защитената зона.",
+    "pinSetupSubtitle": "Задайте 4-цифрен банков ПИН за бързо и защитено отключване.",
+    "pinConfirmLabel": "Потвърдете 4-цифрения ПИН",
+    "unlockButton": "Отключи",
+    "setupButton": "Запази ПИН",
+    "pinMismatch": "Двата ПИН кода не съвпадат.",
+    "pinMustBe4Digits": "ПИН кодът трябва да съдържа точно 4 цифри.",
+    "pinLocked": "Твърде много неуспешни опита. ПИН кодът е временно заключен.",
+    "pinInvalidAttempts": "Невалиден ПИН код. Остават {remaining} опита.",
+    "stepUpTitle": "Потвърждение с ПИН за Пароли",
+    "stepUpSubtitle": "Въведете вашия 4-цифрен ПИН за достъп до криптираните тайни и пароли.",
+    "stepUpSuccess": "Секцията с пароли е отключена за 5 минути."
+  },
+  "documents": {
+    "title": "Документен RAG Сейф",
+    "subtitle": "Качване на PDF и снимки до 50 MB, OCR на DE/BG/EL и интелигентно търсене.",
+    "uploadButton": "Качи документи",
+    "dropzoneText": "Провлачете файлове тук или кликнете за избор (до 50 MB на файл)",
+    "searchPlaceholder": "Търси по заглавие, служба (Kinderzuschlag, Wohngeld), текст...",
+    "emptyState": "Все още няма качени документи в сейфа."
+  },
+  "vault": {
+    "title": "Лични Данни & Криптирани Пароли",
+    "subtitle": "Съхранение на Steuer-ID, IBAN, Kaltmiete и защитени пароли с AES-256-GCM.",
+    "factsTab": "Извлечени Факти",
+    "passwordsTab": "🔐 Пароли & Тайни",
+    "addNew": "Добави запис",
+    "copySuccess": "Копирано в клипборда!",
+    "viewDocument": "Преглед на изходния документ",
+    "stepUpRequired": "За да видите или промените тази парола, потвърдете вашия 4-цифрен ПИН."
+  },
+  "chat": {
+    "title": "Главен AI Асистент",
+    "subtitle": "Оркестрация през LangGraph, двузоново Jev търсене и помощ за немска бюрокрация.",
+    "inputPlaceholder": "Попитайте за документи, писма, Wohngeld, Kinderzuschlag...",
+    "sendButton": "Изпрати"
+  }
+}
