@@ -1,18 +1,19 @@
 'use client';
 
-import React from 'react';
+import React, { useTransition } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   Clock,
   FileText,
-  Home,
+  KeyRound,
+  Lock,
+  LogOut,
   MessageSquare,
   ShieldCheck,
-  Users,
-  Wallet,
 } from 'lucide-react';
-import { useLanguage } from '@/i18n/LanguageContext';
+import { useTranslations } from 'next-intl';
+import { lockPinAction, signOutAction } from '@/features/auth';
 
 interface AppShellProps {
   readonly children: React.ReactNode;
@@ -20,59 +21,48 @@ interface AppShellProps {
 
 export const AppShell: React.FC<AppShellProps> = ({ children }) => {
   const pathname = usePathname();
-  const { locale, dictionary, setLocale } = useLanguage();
+  const t = useTranslations('nav');
+  const appT = useTranslations('app');
+  const [isPending, startTransition] = useTransition();
 
   const navItems = [
-    { href: '/chat', label: dictionary.nav.chat, icon: MessageSquare },
-    { href: '/documents', label: dictionary.nav.documents, icon: FileText },
-    { href: '/finance', label: dictionary.nav.finance, icon: Wallet },
-    { href: '/family', label: dictionary.nav.family, icon: Users },
+    { href: '/', label: t('chat'), icon: MessageSquare, exact: true },
+    { href: '/documents', label: t('documents'), icon: FileText, exact: false },
+    { href: '/vault', label: t('vault'), icon: KeyRound, exact: false },
   ] as const;
+
+  const handleLockPin = () => {
+    startTransition(async () => {
+      await lockPinAction();
+    });
+  };
+
+  const handleSignOut = () => {
+    startTransition(async () => {
+      await signOutAction();
+    });
+  };
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col lg:flex-row">
       {/* Desktop Sidebar */}
       <aside className="hidden lg:flex lg:w-72 lg:flex-col lg:fixed lg:inset-y-0 border-r border-slate-800/80 bg-slate-900/70 backdrop-blur-xl">
         <div className="p-6 border-b border-slate-800/80">
-          <Link
-            href="/"
-            aria-label={dictionary.nav.overview}
-            className="flex items-center gap-3 group"
-          >
+          <Link href="/" aria-label="KRONOS Начало" className="flex items-center gap-3 group">
             <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-linear-to-br from-amber-400 to-orange-600 text-slate-950 shadow-lg shadow-amber-500/20 transition-transform duration-200 group-hover:scale-105">
               <Clock className="h-6 w-6" aria-hidden="true" />
             </span>
             <div>
-              <span className="block text-lg font-bold tracking-tight text-white">
-                KRONOS
-              </span>
-              <span className="block text-xs text-slate-400">
-                {dictionary.app.subtitle}
-              </span>
+              <span className="block text-lg font-bold tracking-tight text-white">KRONOS</span>
+              <span className="block text-xs text-slate-400">{appT('subtitle')}</span>
             </div>
           </Link>
         </div>
 
-        <nav
-          aria-label={dictionary.nav.mainAriaLabel}
-          className="flex-1 px-4 py-6 space-y-1.5"
-        >
-          <Link
-            href="/"
-            aria-label={dictionary.nav.overview}
-            className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-150 ${
-              pathname === '/'
-                ? 'bg-linear-to-r from-amber-500/20 to-orange-500/10 text-amber-300 border border-amber-500/30'
-                : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
-            }`}
-          >
-            <Home className="h-5 w-5 shrink-0" aria-hidden="true" />
-            <span>{dictionary.nav.overview}</span>
-          </Link>
-
+        <nav aria-label={t('mainMenu')} className="flex-1 px-4 py-6 space-y-1.5">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = pathname.startsWith(item.href);
+            const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href);
             return (
               <Link
                 key={item.href}
@@ -94,37 +84,29 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
         <div className="p-4 border-t border-slate-800/80 space-y-3">
           <div className="flex items-center gap-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 text-xs text-emerald-300">
             <ShieldCheck className="h-4 w-4 shrink-0" aria-hidden="true" />
-            <span>{dictionary.app.pinProtectedBadge}</span>
+            <span>{appT('pinProtected')}</span>
           </div>
 
-          <div
-            role="group"
-            aria-label={dictionary.app.languageLabel}
-            className="grid grid-cols-2 gap-1.5 rounded-xl bg-slate-950/80 p-1 border border-slate-800"
-          >
+          <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
-              aria-label="Български език"
-              onClick={() => setLocale('bg')}
-              className={`rounded-lg py-1.5 text-xs font-semibold transition-colors ${
-                locale === 'bg'
-                  ? 'bg-amber-500 text-slate-950'
-                  : 'text-slate-400 hover:text-white'
-              }`}
+              disabled={isPending}
+              onClick={handleLockPin}
+              aria-label={appT('lockPin')}
+              className="flex items-center justify-center gap-1.5 rounded-xl bg-slate-950/80 border border-slate-800 py-2 px-3 text-xs font-semibold text-slate-300 hover:text-white hover:border-amber-500/40 transition-colors"
             >
-              🇧🇬 BG
+              <Lock className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>{appT('lockPin')}</span>
             </button>
             <button
               type="button"
-              aria-label="Ελληνική γλώσσα"
-              onClick={() => setLocale('el')}
-              className={`rounded-lg py-1.5 text-xs font-semibold transition-colors ${
-                locale === 'el'
-                  ? 'bg-amber-500 text-slate-950'
-                  : 'text-slate-400 hover:text-white'
-              }`}
+              disabled={isPending}
+              onClick={handleSignOut}
+              aria-label={appT('signOut')}
+              className="flex items-center justify-center gap-1.5 rounded-xl bg-slate-950/80 border border-slate-800 py-2 px-3 text-xs font-semibold text-rose-400 hover:text-rose-300 hover:border-rose-500/40 transition-colors"
             >
-              🇬🇷 EL
+              <LogOut className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>{appT('signOut')}</span>
             </button>
           </div>
         </div>
@@ -132,37 +114,31 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
 
       {/* Mobile Top Header */}
       <header className="lg:hidden sticky top-0 z-30 flex items-center justify-between border-b border-slate-800/80 bg-slate-950/85 backdrop-blur-xl px-4 py-3">
-        <Link href="/" aria-label={dictionary.nav.overview} className="flex items-center gap-2.5">
+        <Link href="/" aria-label="KRONOS Начало" className="flex items-center gap-2.5">
           <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-linear-to-br from-amber-400 to-orange-600 text-slate-950">
             <Clock className="h-5 w-5" aria-hidden="true" />
           </span>
           <span className="font-bold tracking-tight text-white">KRONOS</span>
         </Link>
 
-        <div
-          role="group"
-          aria-label={dictionary.app.languageLabel}
-          className="flex items-center gap-1 rounded-lg bg-slate-900 p-1 border border-slate-800"
-        >
+        <div className="flex items-center gap-1.5">
           <button
             type="button"
-            aria-label="Български език"
-            onClick={() => setLocale('bg')}
-            className={`rounded-md px-2.5 py-1 text-xs font-semibold ${
-              locale === 'bg' ? 'bg-amber-500 text-slate-950' : 'text-slate-400'
-            }`}
+            disabled={isPending}
+            onClick={handleLockPin}
+            aria-label={appT('lockPin')}
+            className="p-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white"
           >
-            🇧🇬 BG
+            <Lock className="h-4 w-4" aria-hidden="true" />
           </button>
           <button
             type="button"
-            aria-label="Ελληνική γλώσσα"
-            onClick={() => setLocale('el')}
-            className={`rounded-md px-2.5 py-1 text-xs font-semibold ${
-              locale === 'el' ? 'bg-amber-500 text-slate-950' : 'text-slate-400'
-            }`}
+            disabled={isPending}
+            onClick={handleSignOut}
+            aria-label={appT('signOut')}
+            className="p-2 rounded-lg bg-slate-900 border border-slate-800 text-rose-400 hover:text-rose-300"
           >
-            🇬🇷 EL
+            <LogOut className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
       </header>
@@ -172,14 +148,14 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
         <div className="mx-auto max-w-6xl px-4 py-6 sm:px-8 sm:py-10">{children}</div>
       </main>
 
-      {/* Mobile 4-Icon Bottom Navigation */}
+      {/* Mobile 3-Icon Bottom Navigation */}
       <nav
-        aria-label={dictionary.nav.mobileAriaLabel}
-        className="lg:hidden fixed bottom-0 inset-x-0 z-30 grid grid-cols-4 border-t border-slate-800/80 bg-slate-950/90 backdrop-blur-xl px-2 py-2"
+        aria-label={t('mobileMenu')}
+        className="lg:hidden fixed bottom-0 inset-x-0 z-30 grid grid-cols-3 border-t border-slate-800/80 bg-slate-950/90 backdrop-blur-xl px-2 py-2"
       >
         {navItems.map((item) => {
           const Icon = item.icon;
-          const isActive = pathname.startsWith(item.href);
+          const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href);
           return (
             <Link
               key={item.href}

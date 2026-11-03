@@ -14,8 +14,8 @@ flowchart LR
     P3 --> PROD["🚀 Production в Vercel & Реална Употреба"]
 
     style P0 fill:#10b981,stroke:#059669,stroke-width:2px,color:#ffffff
-    style P1 fill:#f59e0b,stroke:#d97706,stroke-width:3px,color:#000000
-    style P2 fill:#1e293b,stroke:#475569,stroke-width:1px,color:#94a3b8
+    style P1 fill:#10b981,stroke:#059669,stroke-width:2px,color:#ffffff
+    style P2 fill:#f59e0b,stroke:#d97706,stroke-width:3px,color:#000000
     style P3 fill:#1e293b,stroke:#475569,stroke-width:1px,color:#94a3b8
     style PROD fill:#0284c7,stroke:#38bdf8,stroke-width:2px,color:#ffffff
 ```
@@ -23,8 +23,8 @@ flowchart LR
 | Фаза | Фокус | Статус |
 | :--- | :--- | :---: |
 | **Фаза 0** | **Конституция (`AGENTS.md`), Antigravity Skills, CodeRabbit & Next.js 16 Ядро** | ✅ **Завършена** |
-| **Фаза 1** | **Supabase DB + Supabase Storage (`50 MB`), 4-Цифрен ПИН, Криптиране на Пароли, `next-intl` & LangGraph** | ⏳ **Текуща** |
-| **Фаза 2** | **Директен Масов RAG Сейф (`/documents` без бота), Сваляне/ZIP/PDF & Панел Данни/Пароли (`/vault`)** | 📋 Следваща |
+| **Фаза 1** | **Supabase DB + Supabase Storage (`50 MB`), 4-Цифрен ПИН, Криптиране на Пароли, `next-intl` & LangGraph** | ✅ **Завършена** |
+| **Фаза 2** | **Директен Масов RAG Сейф (`/documents` без бота), Сваляне/ZIP/PDF & Панел Данни/Пароли (`/vault`)** | ⏳ **Текуща** |
 | **Фаза 3** | **Главен AI Бот (Jev Reranking за Зона 1 + Зона 2) & Субагенти за Онлайн Портали и PDF Молби** | 📋 Планирана |
 | **Production** | **Деплой във Vercel, ежедневна реална работа и планиране на нови модули според нуждите** | 🎯 Цел |
 
@@ -40,27 +40,28 @@ flowchart LR
 
 ---
 
-### ⏳ Фаза 1: Supabase DB + Supabase Storage, Вход с 4-Цифрен ПИН, Криптиране & LangGraph Ядро (ТЕКУЩА)
-- [ ] **Инсталиране на основните пакети (изчистено, без външни S3 библиотеки):**
+### ✅ Фаза 1: Supabase DB + Supabase Storage, Вход с 4-Цифрен ПИН, Криптиране & LangGraph Ядро (ЗАВЪРШЕНА)
+- [x] **Инсталиране на основните пакети (изчистено, без външни S3 библиотеки):**
   - `@langchain/core`, `@langchain/langgraph`, `@langchain/openai` (насочен към OpenRouter).
-  - `next-intl` (официална i18n система на Български).
+  - `next-intl` (официална i18n система на Български чрез `src/i18n/request.ts` и `messages/bg.json`).
   - `@supabase/supabase-js`, `@supabase/ssr` (покрива БД, Вектори, Auth и Файловия Сейф!).
-- [ ] **Supabase PostgreSQL + `pgvector` Схема (чрез Supabase MCP + автоматични типове):**
+- [x] **Supabase PostgreSQL + `pgvector` Схема (чрез Supabase MCP + автоматични типове в `src/types/databaseTypes.ts`):**
   - `profiles` — профил + `scrypt` хеш на 4-цифрения ПИН + защита при 5 грешни опита.
   - `documents` — заглавие, тема/служба (`Kinderzuschlag`, `Wohngeld`, `Kontoauszug` и др.), `doc_date` (дата от самия документ), `created_at` (дата на качване), `expires_at`, `storage_path` (път към файла в `kronos-vault`), OCR текст (DE/BG/EL) и `pgvector(1536)` HNSW + Full-Text индекси.
   - `vault_items` — лични данни и пароли с `source_document_id` (референция към документа при извлечено `Steuer-ID` и др., или `null` при директно въведен факт/парола) и сървърно `AES-256-GCM` криптиране за пароли (`is_secret = true`).
-  - `chat_sessions` и `chat_messages` + строги RLS политики на всички таблици.
-- [ ] **Supabase Storage Сейф (`kronos-vault` — до `50 MB` на файл, `1 GB` безплатно без карта):**
-  - Създаване на частен (Private) bucket `kronos-vault` със строги RLS политики за `storage.objects`.
-  - Изолиран `src/features/storage/dal/storageDal.ts` с директни подписани URL-и (`createSignedUploadUrl` / `createSignedUrl`), заобикалящи 4.5 MB лимита на Vercel + централна `Hard Purge` логика (а ако някога обемът от 1 GB отеснее, превключването към друг сторидж като Cloudflare R2 става само в този 1 файл).
-- [ ] **Двоен Вход & Защита на Пароли:**
+  - `chat_sessions` и `chat_messages` + строги RLS политики на всички 5 таблици.
+- [x] **Supabase Storage Сейф (`kronos-vault` — до `50 MB` на файл, `1 GB` безплатно без карта):**
+  - Създаден частен (Private) bucket `kronos-vault` със строги RLS политики за `storage.objects` (папка = `auth.uid()`).
+  - Изолиран `src/features/storage/dal/storageDal.ts` с директни подписани URL-и (`createSignedUploadUrl` / `createSignedUrl`), заобикалящи 4.5 MB лимита на Vercel + централна `Hard Purge` логика (`purgeVaultStorageObjects`).
+- [x] **Двоен Вход & Защита на Пароли:**
   - `Email + Парола` (`/login`) + **точно 4-цифрен ПИН** (`/pin`), отключващ се автоматично на 4-тата цифра (15-мин sliding `HttpOnly` cookie).
-  - Допълнително **Step-Up ПИН потвърждение** за секция **🔐 Пароли** (при отваряне, преглед, промяна и изтриване).
-- [ ] **Keep-Alive Cron за Vercel** + чист Production Admin Shell (`🤖 AI Асистент`, `📂 Документен Сейф`, `🗂️ Данни & 🔐 Пароли`).
+  - Допълнително **Step-Up ПИН потвърждение** за секция **🔐 Пароли** (`requireStepUpPin`).
+- [x] **Keep-Alive Cron за Vercel (`/api/cron/keep-alive` + `vercel.json`)** + чист Production Admin Shell (`🤖 AI Асистент`, `📂 Документен Сейф`, `🗂️ Данни & 🔐 Пароли`).
+- [x] **Пълен Phase Gate (`pnpm verify`)**: `verify:arch` (0 нарушения), `typecheck` (0 грешки), `lint` (0 грешки), `test` (18/18 успешни теста) и `build` (успешен Next.js 16.4.3 production билд).
 
 ---
 
-### 📋 Фаза 2: Директен Масов RAG Сейф (`/documents`) & Ръчен Панел за Данни и Пароли (`/vault`)
+### ⏳ Фаза 2: Директен Масов RAG Сейф (`/documents`) & Ръчен Панел за Данни и Пароли (`/vault`) (ТЕКУЩА)
 *(Веднага след Фаза 2 започваш директно да качваш всички документи в сейфа, без да ти трябва дори чатът!)*
 - [ ] **Масово Drag & Drop Качване в RAG Сейфа (10–20+ файла наведнъж) + Снимане от Телефон:**
   - Качване на готови PDF-и (`Kontoauszüge`, договори, актове) от компютър или многостранични снимки от телефон ➔ PDF в Supabase Storage (`kronos-vault`).

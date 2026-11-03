@@ -64,3 +64,41 @@ export const parsePublicEnv = (): EnvValidationResult<PublicEnvConfig> => {
     };
   }
 };
+
+export const getSupabaseConfig = () => {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+
+  if (!url || !publishableKey) {
+    throw new Error(
+      'Липсва NEXT_PUBLIC_SUPABASE_URL или NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY в .env конфигурацията.'
+    );
+  }
+
+  const parsedUrl = z.string().url().safeParse(url);
+  if (!parsedUrl.success) {
+    throw new Error(
+      'Невалиден URL адрес за NEXT_PUBLIC_SUPABASE_URL в .env конфигурацията.'
+    );
+  }
+
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const storageBucket = process.env.SUPABASE_STORAGE_BUCKET ?? 'kronos-vault';
+
+  return { url: parsedUrl.data, publishableKey, serviceRoleKey, storageBucket };
+};
+
+export const getCryptoSecrets = () => {
+  const pinSecret = process.env.KRONOS_PIN_SECRET;
+  const vaultKey = process.env.KRONOS_VAULT_ENCRYPTION_KEY;
+
+  if (!pinSecret || pinSecret.length < 32) {
+    throw new Error('Липсва или е невалиден KRONOS_PIN_SECRET (минимум 32 символа).');
+  }
+
+  if (!vaultKey || vaultKey.length < 32) {
+    throw new Error('Липсва или е невалиден KRONOS_VAULT_ENCRYPTION_KEY (минимум 32 символа).');
+  }
+
+  return { pinSecret, vaultKey };
+};
