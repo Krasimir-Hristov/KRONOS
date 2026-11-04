@@ -7,9 +7,7 @@ export type Json =
   | Json[];
 
 export type Database = {
-  __InternalSupabase: {
-    PostgrestVersion: '14.18';
-  };
+  __InternalSupabase: { PostgrestVersion: '14.18' };
   public: {
     Tables: {
       chat_messages: {
@@ -236,25 +234,43 @@ export type Database = {
           value_plain?: string | null;
         };
         Relationships: [
-          {
-            foreignKeyName: 'vault_items_owner_id_fkey';
-            columns: ['owner_id'];
-            isOneToOne: false;
-            referencedRelation: 'profiles';
-            referencedColumns: ['id'];
-          },
-          {
-            foreignKeyName: 'vault_items_source_document_id_fkey';
-            columns: ['source_document_id'];
-            isOneToOne: false;
-            referencedRelation: 'documents';
-            referencedColumns: ['id'];
-          },
+          { foreignKeyName: 'vault_items_owner_id_fkey'; columns: ['owner_id']; isOneToOne: false; referencedRelation: 'profiles'; referencedColumns: ['id'] },
+          { foreignKeyName: 'vault_items_source_document_id_fkey'; columns: ['source_document_id']; isOneToOne: false; referencedRelation: 'documents'; referencedColumns: ['id'] },
         ];
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      save_deduplicated_vault_facts: {
+        Args: { p_candidates?: Json; p_source_document_id: string };
+        Returns: {
+          inserted_count: number;
+          skipped_duplicates: number;
+        }[];
+      };
+      search_documents_classic: {
+        Args: { p_doc_type?: string; p_limit?: number; p_offset?: number; p_only_approved?: boolean; p_query?: string; p_sort_by?: string; p_topic?: string };
+        Returns: {
+          created_at: string;
+          doc_date: string | null;
+          doc_type: string;
+          expires_at: string | null;
+          file_size_bytes: number;
+          id: string;
+          metadata: Json;
+          mime_type: string;
+          original_file_name: string;
+          processing_status: string;
+          relevance_score: number;
+          sender: string;
+          storage_path: string;
+          summary_text: string;
+          title: string;
+          topic: string;
+          updated_at: string;
+        }[];
+      };
+    };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };
@@ -265,3 +281,4 @@ export type DocumentRow = Database['public']['Tables']['documents']['Row'];
 export type VaultItemRow = Database['public']['Tables']['vault_items']['Row'];
 export type ChatSessionRow = Database['public']['Tables']['chat_sessions']['Row'];
 export type ChatMessageRow = Database['public']['Tables']['chat_messages']['Row'];
+export type ClassicSearchDocumentRow = Database['public']['Functions']['search_documents_classic']['Returns'][number];
