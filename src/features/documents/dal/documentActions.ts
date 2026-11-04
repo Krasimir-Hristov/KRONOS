@@ -20,10 +20,10 @@ import {
 } from './documentDal';
 import {
   approveDocumentsBatch,
-  purgeDocumentsHard,
   registerPendingDocument,
   updateApprovedDocumentMetadata,
 } from './documentMutationDal';
+import { purgeDocumentsHard } from './documentPurgeDal';
 import {
   processQueuedDocumentOcrAndRag,
   type ProcessDocumentAiOutcome,
@@ -41,6 +41,7 @@ export const requestDocumentUploadUrlAction = async (
   rawInput: unknown
 ): Promise<
   DocumentActionResponse<{
+    readonly bucket: string;
     readonly storagePath: string;
     readonly signedUrl: string;
     readonly token: string;
@@ -57,10 +58,10 @@ export const requestDocumentUploadUrlAction = async (
     const signed = await createVaultSignedUploadUrl(parsed.data);
     return { ok: true, data: signed };
   } catch (err) {
+    console.error('[DocumentActions] requestDocumentUploadUrlAction error:', err);
     return {
       ok: false,
-      errorMessage:
-        err instanceof Error ? err.message : 'Неуспешна подготовка за качване.',
+      errorMessage: 'Неуспешна подготовка за качване в сейфа.',
     };
   }
 };
@@ -87,10 +88,10 @@ export const registerUploadedDocumentAction = async (
     revalidatePath('/documents');
     return { ok: true, data: created };
   } catch (err) {
+    console.error('[DocumentActions] registerUploadedDocumentAction error:', err);
     return {
       ok: false,
-      errorMessage:
-        err instanceof Error ? err.message : 'Грешка при регистриране на документа.',
+      errorMessage: 'Грешка при регистриране на качения документ.',
     };
   }
 };
@@ -107,9 +108,10 @@ export const processDocumentOcrAction = async (
     revalidatePath('/documents');
     return { ok: true, data: outcome };
   } catch (err) {
+    console.error('[DocumentActions] processDocumentOcrAction error:', err);
     return {
       ok: false,
-      errorMessage: err instanceof Error ? err.message : 'Грешка при OCR обработка.',
+      errorMessage: 'Грешка при OCR обработка на документа.',
     };
   }
 };
@@ -125,9 +127,10 @@ export const searchDocumentsClassicAction = async (
     const items = await searchCatalogDocumentsClassic(parsed.data);
     return { ok: true, data: items };
   } catch (err) {
+    console.error('[DocumentActions] searchDocumentsClassicAction error:', err);
     return {
       ok: false,
-      errorMessage: err instanceof Error ? err.message : 'Грешка при търсене.',
+      errorMessage: 'Грешка при търсене на документи.',
     };
   }
 };
@@ -139,10 +142,10 @@ export const fetchReviewQueueAction = async (): Promise<
     const items = await listReviewQueueDocuments();
     return { ok: true, data: items };
   } catch (err) {
+    console.error('[DocumentActions] fetchReviewQueueAction error:', err);
     return {
       ok: false,
-      errorMessage:
-        err instanceof Error ? err.message : 'Грешка при зареждане на опашката.',
+      errorMessage: 'Грешка при зареждане на опашката за одобрение.',
     };
   }
 };
@@ -169,9 +172,10 @@ export const approveDocumentsBatchAction = async (
     revalidatePath('/vault');
     return { ok: true, data: res };
   } catch (err) {
+    console.error('[DocumentActions] approveDocumentsBatchAction error:', err);
     return {
       ok: false,
-      errorMessage: err instanceof Error ? err.message : 'Грешка при одобрение.',
+      errorMessage: 'Грешка при одобрение на документите.',
     };
   }
 };
@@ -191,9 +195,10 @@ export const updateDocumentMetaAction = async (
     revalidatePath('/documents');
     return { ok: true, data: null };
   } catch (err) {
+    console.error('[DocumentActions] updateDocumentMetaAction error:', err);
     return {
       ok: false,
-      errorMessage: err instanceof Error ? err.message : 'Грешка при редакция.',
+      errorMessage: 'Грешка при редакция на документа.',
     };
   }
 };
@@ -209,9 +214,10 @@ export const getDocumentSignedUrlAction = async (
     const res = await createVaultSignedDownloadUrl(parsed.data.storagePath, 1800);
     return { ok: true, data: res };
   } catch (err) {
+    console.error('[DocumentActions] getDocumentSignedUrlAction error:', err);
     return {
       ok: false,
-      errorMessage: err instanceof Error ? err.message : 'Грешка при линк за преглед.',
+      errorMessage: 'Грешка при генериране на защитен линк за преглед.',
     };
   }
 };
@@ -229,10 +235,10 @@ export const purgeDocumentsAction = async (
     revalidatePath('/vault');
     return { ok: true, data: res };
   } catch (err) {
+    console.error('[DocumentActions] purgeDocumentsAction error:', err);
     return {
       ok: false,
-      errorMessage:
-        err instanceof Error ? err.message : 'Грешка при физическо изтриване.',
+      errorMessage: 'Грешка при физическо изтриване на документите.',
     };
   }
 };

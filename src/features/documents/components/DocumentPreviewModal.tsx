@@ -1,8 +1,12 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { Loader2, Save, X } from 'lucide-react';
+import {
+  getDialogFocusableElements,
+  useDialogFocusTrap,
+} from '@/lib/ui/useDialogFocusTrap';
 import { getDocumentSignedUrlAction } from '../dal/documentActions';
 import {
   DOCUMENT_TOPIC_LABELS_BG,
@@ -28,8 +32,13 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
   onClose,
   onSaveMeta,
 }) => {
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  useDialogFocusTrap(dialogRef, onClose, closeButtonRef);
+
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [urlError, setUrlError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [title, setTitle] = useState(doc.title);
   const [topic, setTopic] = useState<DocumentTopic>(doc.topic);
   const [docType, setDocType] = useState<DocumentType>(doc.docType);
@@ -56,25 +65,46 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
 
   const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    await onSaveMeta({
-      id: doc.id,
-      title: title.trim() || doc.title,
-      topic,
-      docType,
-      sender: sender.trim(),
-      docDate: docDate.trim() || null,
-      expiresAt: expiresAt.trim() || null,
-    });
-    onClose();
+    setSaveError(null);
+    try {
+      await onSaveMeta({
+        id: doc.id,
+        title: title.trim() || doc.title,
+        topic,
+        docType,
+        sender: sender.trim(),
+        docDate: docDate.trim() || null,
+        expiresAt: expiresAt.trim() || null,
+      });
+      onClose();
+    } catch (err) {
+      setSaveError(
+        err instanceof Error
+          ? err.message
+          : 'Неуспешно запазване на промените по документа.'
+      );
+    }
   };
 
   return (
     <div
+      ref={dialogRef}
+      tabIndex={-1}
       role="dialog"
       aria-modal="true"
       aria-label={`Преглед на документ ${doc.title}`}
       className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/85 backdrop-blur-md p-3 sm:p-6"
     >
+      <span
+        tabIndex={0}
+        data-focus-sentinel="true"
+        aria-hidden="true"
+        className="sr-only"
+        onFocus={() => {
+          const focusables = getDialogFocusableElements(dialogRef.current);
+          focusables[focusables.length - 1]?.focus();
+        }}
+      />
       <article className="flex flex-col lg:flex-row w-full max-w-6xl h-[90vh] overflow-hidden rounded-3xl border border-zinc-800 bg-zinc-950 shadow-2xl">
         <div className="flex-1 bg-zinc-900/60 flex items-center justify-center overflow-auto p-3 border-b lg:border-b-0 lg:border-r border-zinc-800">
           {!signedUrl && !urlError && (
@@ -110,6 +140,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
           <header className="flex items-center justify-between border-b border-zinc-800 pb-3">
             <h2 className="text-sm font-bold text-white tracking-wide">Детайли & Редакция</h2>
             <button
+              ref={closeButtonRef}
               type="button"
               onClick={onClose}
               aria-label="Затвори прегледа"
@@ -127,7 +158,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
               aria-label="Заглавие на документа"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs text-white focus:border-cyan-500 focus:outline-none"
+              className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2 text-base md:text-xs text-white focus:border-cyan-500 focus:outline-none"
             />
           </div>
 
@@ -138,7 +169,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                 aria-label="Тема на документа"
                 value={topic}
                 onChange={(e) => setTopic(e.target.value as DocumentTopic)}
-                className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-2.5 py-2 text-xs text-white focus:border-cyan-500 focus:outline-none"
+                className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-2.5 py-2 text-base md:text-xs text-white focus:border-cyan-500 focus:outline-none"
               >
                 {DOCUMENT_TOPICS.map((t) => (
                   <option key={t} value={t}>
@@ -153,7 +184,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                 aria-label="Вид на документа"
                 value={docType}
                 onChange={(e) => setDocType(e.target.value as DocumentType)}
-                className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-2.5 py-2 text-xs text-white focus:border-cyan-500 focus:outline-none"
+                className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-2.5 py-2 text-base md:text-xs text-white focus:border-cyan-500 focus:outline-none"
               >
                 {DOCUMENT_TYPES.map((dt) => (
                   <option key={dt} value={dt}>
@@ -171,7 +202,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
               aria-label="Подател на документа"
               value={sender}
               onChange={(e) => setSender(e.target.value)}
-              className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs text-white focus:border-cyan-500 focus:outline-none"
+              className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2 text-base md:text-xs text-white focus:border-cyan-500 focus:outline-none"
             />
           </div>
 
@@ -183,7 +214,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                 aria-label="Дата от документа"
                 value={docDate}
                 onChange={(e) => setDocDate(e.target.value)}
-                className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-2.5 py-2 text-xs text-white focus:border-cyan-500 focus:outline-none"
+                className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-2.5 py-2 text-base md:text-xs text-white focus:border-cyan-500 focus:outline-none"
               />
             </div>
             <div>
@@ -193,7 +224,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                 aria-label="Краен срок по документа"
                 value={expiresAt}
                 onChange={(e) => setExpiresAt(e.target.value)}
-                className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-2.5 py-2 text-xs text-white focus:border-cyan-500 focus:outline-none"
+                className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-2.5 py-2 text-base md:text-xs text-white focus:border-cyan-500 focus:outline-none"
               />
             </div>
           </div>
@@ -207,6 +238,15 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
             </div>
           )}
 
+          {saveError && (
+            <p
+              role="alert"
+              className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-3.5 py-2.5 text-xs text-rose-300"
+            >
+              {saveError}
+            </p>
+          )}
+
           <button
             type="submit"
             disabled={isSaving}
@@ -218,6 +258,20 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
           </button>
         </form>
       </article>
+      <span
+        tabIndex={0}
+        data-focus-sentinel="true"
+        aria-hidden="true"
+        className="sr-only"
+        onFocus={() => {
+          if (closeButtonRef.current) {
+            closeButtonRef.current.focus();
+            return;
+          }
+          const focusables = getDialogFocusableElements(dialogRef.current);
+          focusables[0]?.focus();
+        }}
+      />
     </div>
   );
 };

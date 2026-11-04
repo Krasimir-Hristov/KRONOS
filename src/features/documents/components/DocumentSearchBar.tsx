@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useTranslations } from 'next-intl';
 import { ArrowUpDown, Search } from 'lucide-react';
 import {
   DOCUMENT_TOPIC_LABELS_BG,
@@ -28,6 +29,8 @@ export const DocumentSearchBar: React.FC<DocumentSearchBarProps> = ({
   onTopicChange,
   onSortChange,
 }) => {
+  const t = useTranslations('documents');
+
   return (
     <section aria-label="Класическа търсачка и филтри за документи" className="space-y-3">
       <div className="flex flex-col md:flex-row gap-3">
@@ -41,8 +44,8 @@ export const DocumentSearchBar: React.FC<DocumentSearchBarProps> = ({
             value={searchInput}
             onChange={(e) => onSearchChange(e.target.value)}
             aria-label="Търси в документите по заглавие, служба или OCR текст"
-            placeholder="Мигновено търсене (0 €): Kinderzuschlag, Wohngeld, Sparkasse, IBAN..."
-            className="w-full rounded-2xl border border-zinc-800 bg-zinc-900/90 pl-11 pr-4 py-3 text-sm text-white placeholder-zinc-500 focus:border-cyan-500/80 focus:ring-1 focus:ring-cyan-500/80 focus:outline-none transition-all font-medium"
+            placeholder={t('searchPlaceholder')}
+            className="w-full rounded-2xl border border-zinc-800 bg-zinc-900/90 pl-11 pr-4 py-3 text-base md:text-sm text-white placeholder-zinc-500 focus:border-cyan-500/80 focus:ring-1 focus:ring-cyan-500/80 focus:outline-none transition-all font-medium"
           />
         </div>
 
@@ -52,7 +55,7 @@ export const DocumentSearchBar: React.FC<DocumentSearchBarProps> = ({
             aria-label="Сортиране на документите"
             value={sortBy}
             onChange={(e) => onSortChange(e.target.value as DocumentSortMode)}
-            className="rounded-2xl border border-zinc-800 bg-zinc-900/90 px-3.5 py-3 text-xs font-mono font-semibold text-zinc-200 focus:border-cyan-500 focus:outline-none transition-colors"
+            className="rounded-2xl border border-zinc-800 bg-zinc-900/90 px-3.5 py-3 text-base md:text-xs font-mono font-semibold text-zinc-200 focus:border-cyan-500 focus:outline-none transition-colors"
           >
             <option value="doc_date_desc">Дата от документа (най-нови)</option>
             <option value="doc_date_asc">Дата от документа (най-стари)</option>
@@ -75,7 +78,7 @@ export const DocumentSearchBar: React.FC<DocumentSearchBarProps> = ({
                 : 'border border-zinc-800 bg-zinc-900/80 text-zinc-400 hover:text-white hover:border-zinc-700'
             }`}
           >
-            Всички ({totalCount})
+            {t('allTopics', { count: totalCount })}
           </button>
           {DOCUMENT_TOPICS.map((topic) => (
             <button

@@ -106,7 +106,7 @@ export const VaultFilterBar: React.FC<VaultFilterBarProps> = ({
             onChange={(e) => onSearchChange(e.target.value)}
             aria-label="Търсене в данни и пароли"
             placeholder="Търси по етикет, IBAN, Steuer-ID..."
-            className="w-full rounded-xl border border-zinc-800 bg-zinc-900/90 pl-10 pr-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:border-cyan-500 focus:outline-none transition-colors"
+            className="w-full rounded-xl border border-zinc-800 bg-zinc-900/90 pl-10 pr-4 py-2.5 text-base md:text-sm text-white placeholder-zinc-500 focus:border-cyan-500 focus:outline-none transition-colors"
           />
         </div>
       </div>

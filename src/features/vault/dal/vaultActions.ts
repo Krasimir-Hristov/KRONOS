@@ -42,9 +42,10 @@ const mapVaultError = (err: unknown, fallbackMessage: string): VaultActionRespon
       requiresStepUp: true,
     };
   }
+  console.error('[VaultActions] Server error:', err);
   return {
     ok: false,
-    errorMessage: err instanceof Error ? err.message : fallbackMessage,
+    errorMessage: fallbackMessage,
   };
 };
 

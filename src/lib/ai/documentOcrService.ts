@@ -1,6 +1,10 @@
 import 'server-only';
 import { z } from 'zod';
 import { getAiModelsConfig, OPENROUTER_ENDPOINTS } from '@/config/aiModelsConfig';
+import {
+  isSuspectedSecretFact,
+  redactSecretsFromFreeText,
+} from '@/lib/security/secretFactGuard';
 
 export const DOCUMENT_TOPICS = [
   'kinderzuschlag',
@@ -35,28 +39,38 @@ export const FACT_CATEGORIES = [
   'other',
 ] as const;
 
-export const ocrSuggestedFactSchema = z.object({
-  label: z.string().trim().min(1).max(120),
-  value: z.string().trim().min(1).max(500),
-  category: z.enum(FACT_CATEGORIES).catch('other'),
-  hint: z.string().trim().max(240).nullable().optional(),
-});
+const isValidOcrIsoDate = (val: string): boolean => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(val)) return false;
+  const [yStr, mStr, dStr] = val.split('-');
+  const y = Number(yStr);
+  const m = Number(mStr);
+  const d = Number(dStr);
+  const utc = new Date(Date.UTC(y, m - 1, d));
+  return (
+    utc.getUTCFullYear() === y &&
+    utc.getUTCMonth() === m - 1 &&
+    utc.getUTCDate() === d
+  );
+};
+
+export const ocrSuggestedFactSchema = z
+  .object({
+    label: z.string().trim().min(1).max(120),
+    value: z.string().trim().min(1).max(500),
+    category: z.enum(FACT_CATEGORIES).catch('other'),
+    hint: z.string().trim().max(240).nullable().optional(),
+  })
+  .refine((fact) => !isSuspectedSecretFact(fact.label, fact.hint), {
+    message: 'Пароли и ПИН кодове не се допускат като обикновени факти.',
+  });
 
 export const ocrExtractionResultSchema = z.object({
   title: z.string().trim().min(1).max(200),
   topic: z.enum(DOCUMENT_TOPICS).catch('allgemein'),
   docType: z.enum(DOCUMENT_TYPES).catch('sonstiges'),
   sender: z.string().trim().max(160).default(''),
-  docDate: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .nullable()
-    .catch(null),
-  expiresAt: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .nullable()
-    .catch(null),
+  docDate: z.string().refine(isValidOcrIsoDate).nullable().catch(null),
+  expiresAt: z.string().refine(isValidOcrIsoDate).nullable().catch(null),
   summaryText: z.string().trim().max(2500).default(''),
   rawOcrText: z.string().default(''),
   suggestedFacts: z.array(ocrSuggestedFactSchema).max(25).default([]),
@@ -104,7 +118,7 @@ const OCR_SYSTEM_PROMPT = `Ти си експертен OCR и документ�
     }
   ]
 }
-ВАЖНО: Никога не извличай пароли или ПИН кодове в suggestedFacts.`;
+ВАЖНО: Никога не извличай пароли, ПИН кодове, PUK или TAN кодове в suggestedFacts и ги маскирай като [СКРИТА ТАЙНА] в текста.`;
 
 export const parseOcrJsonContent = (rawContent: string): OcrExtractionResult => {
   const cleaned = rawContent
@@ -114,13 +128,43 @@ export const parseOcrJsonContent = (rawContent: string): OcrExtractionResult => 
     .trim();
 
   const parsedJson: unknown = JSON.parse(cleaned);
-  const validated = ocrExtractionResultSchema.safeParse(parsedJson);
+  const droppedSecrets: string[] = [];
 
+  if (parsedJson && typeof parsedJson === 'object' && !Array.isArray(parsedJson)) {
+    const record = parsedJson as Record<string, unknown>;
+    if (Array.isArray(record.suggestedFacts)) {
+      const safeFacts: unknown[] = [];
+      for (const rawFact of record.suggestedFacts) {
+        if (rawFact && typeof rawFact === 'object') {
+          const factObj = rawFact as Record<string, unknown>;
+          const label = typeof factObj.label === 'string' ? factObj.label : '';
+          const hint = typeof factObj.hint === 'string' ? factObj.hint : null;
+          if (isSuspectedSecretFact(label, hint)) {
+            if (typeof factObj.value === 'string' && factObj.value.trim()) {
+              droppedSecrets.push(factObj.value.trim());
+            }
+            continue;
+          }
+        }
+        const checked = ocrSuggestedFactSchema.safeParse(rawFact);
+        if (checked.success) {
+          safeFacts.push(checked.data);
+        }
+      }
+      record.suggestedFacts = safeFacts;
+    }
+  }
+
+  const validated = ocrExtractionResultSchema.safeParse(parsedJson);
   if (!validated.success) {
     throw new Error('Невалидна структура на OCR отговора от AI модела.');
   }
 
-  return validated.data;
+  return {
+    ...validated.data,
+    summaryText: redactSecretsFromFreeText(validated.data.summaryText, droppedSecrets),
+    rawOcrText: redactSecretsFromFreeText(validated.data.rawOcrText, droppedSecrets),
+  };
 };
 
 export const extractDocumentWithVisionOcr = async (

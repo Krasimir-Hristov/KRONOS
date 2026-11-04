@@ -1,8 +1,8 @@
 import 'server-only';
 import { requireAuthAndPin } from '@/features/auth/server';
 import { createServerSupabaseClient } from '@/lib/supabase/supabaseServer';
+import type { Json } from '@/types/databaseTypes';
 import {
-  areFactsDuplicate,
   extractedFactCandidateSchema,
   vaultCategorySchema,
   vaultFactInputSchema,
@@ -84,6 +84,19 @@ export const createVaultFact = async (input: VaultFactInput): Promise<string> =>
     const validated = vaultFactInputSchema.parse(input);
     const supabase = await createServerSupabaseClient();
 
+    if (validated.sourceDocumentId) {
+      const { data: ownedDoc, error: docErr } = await supabase
+        .from('documents')
+        .select('id')
+        .eq('id', validated.sourceDocumentId)
+        .eq('owner_id', userId)
+        .maybeSingle();
+
+      if (docErr || !ownedDoc) {
+        throw new Error('Изходният документ не е намерен или нямате права за него.');
+      }
+    }
+
     const { data, error } = await supabase
       .from('vault_items')
       .insert({
@@ -117,7 +130,7 @@ export const updateVaultFact = async (input: VaultFactUpdateInput): Promise<void
     const validated = vaultFactUpdateSchema.parse(input);
     const supabase = await createServerSupabaseClient();
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('vault_items')
       .update({
         category: validated.category,
@@ -127,9 +140,10 @@ export const updateVaultFact = async (input: VaultFactUpdateInput): Promise<void
       })
       .eq('id', validated.id)
       .eq('owner_id', userId)
-      .eq('is_secret', false);
+      .eq('is_secret', false)
+      .select('id');
 
-    if (error) {
+    if (error || !data || data.length === 0) {
       throw new Error('Неуспешна промяна на записа.');
     }
   } catch (err) {
@@ -166,79 +180,43 @@ export const saveApprovedFactsDeduplicated = async (
   rawCandidates: readonly ExtractedFactCandidate[]
 ): Promise<{ readonly insertedCount: number; readonly skippedDuplicates: number }> => {
   try {
-    const { userId } = await requireAuthAndPin({ redirectOnFail: false });
+    await requireAuthAndPin({ redirectOnFail: false });
     if (rawCandidates.length === 0) {
       return { insertedCount: 0, skippedDuplicates: 0 };
     }
 
-    const supabase = await createServerSupabaseClient();
-    const { data: existingRows, error: loadErr } = await supabase
-      .from('vault_items')
-      .select('id, label, value_plain, source_document_id')
-      .eq('owner_id', userId)
-      .eq('is_secret', false);
-
-    if (loadErr) {
-      throw new Error('Грешка при проверка за дублирани факти.');
-    }
-
-    const knownFacts: Array<{ id?: string; label: string; value: string; sourceDocId: string | null }> =
-      (existingRows ?? []).map((r) => ({
-        id: r.id,
-        label: r.label,
-        value: r.value_plain ?? '',
-        sourceDocId: r.source_document_id,
-      }));
-
-    let insertedCount = 0;
-    let skippedDuplicates = 0;
-
+    const validCandidates: Json[] = [];
     for (const item of rawCandidates) {
       const parsed = extractedFactCandidateSchema.safeParse(item);
-      if (!parsed.success) {
-        continue;
-      }
-
-      const candidate = parsed.data;
-      const matchingExisting = knownFacts.find((existing) =>
-        areFactsDuplicate(existing, { label: candidate.label, value: candidate.value })
-      );
-
-      if (matchingExisting) {
-        skippedDuplicates += 1;
-        if (matchingExisting.id && !matchingExisting.sourceDocId) {
-          await supabase
-            .from('vault_items')
-            .update({ source_document_id: sourceDocumentId })
-            .eq('id', matchingExisting.id)
-            .eq('owner_id', userId);
-          matchingExisting.sourceDocId = sourceDocumentId;
-        }
-        continue;
-      }
-
-      const { error: insertErr } = await supabase.from('vault_items').insert({
-        owner_id: userId,
-        category: candidate.category,
-        label: candidate.label,
-        value_plain: candidate.value,
-        value_encrypted: null,
-        is_secret: false,
-        username_or_hint: candidate.hint ?? null,
-        source_document_id: sourceDocumentId,
-      });
-
-      if (!insertErr) {
-        insertedCount += 1;
-        knownFacts.push({
-          label: candidate.label,
-          value: candidate.value,
-          sourceDocId: sourceDocumentId,
+      if (parsed.success) {
+        validCandidates.push({
+          label: parsed.data.label,
+          value: parsed.data.value,
+          category: parsed.data.category,
+          hint: parsed.data.hint ?? null,
         });
       }
     }
 
-    return { insertedCount, skippedDuplicates };
+    if (validCandidates.length === 0) {
+      return { insertedCount: 0, skippedDuplicates: 0 };
+    }
+
+    const supabase = await createServerSupabaseClient();
+    const { data, error } = await supabase.rpc('save_deduplicated_vault_facts', {
+      p_source_document_id: sourceDocumentId,
+      p_candidates: validCandidates,
+    });
+
+    if (error) {
+      throw new Error('Грешка при запис на одобрените факти в сейфа.');
+    }
+
+    const row = Array.isArray(data) ? data[0] : undefined;
+    return {
+      insertedCount: row?.inserted_count ?? 0,
+      skippedDuplicates: row?.skipped_duplicates ?? 0,
+    };
   } catch (err) {
     const msg =
       err instanceof Error ? err.message : 'Грешка при запис на одобрени факти.';

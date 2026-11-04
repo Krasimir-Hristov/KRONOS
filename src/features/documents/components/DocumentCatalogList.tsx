@@ -1,7 +1,17 @@
 'use client';
 
 import React from 'react';
-import { Calendar, Clock, Download, Eye, FileCode, Trash2 } from 'lucide-react';
+import { useTranslations } from 'next-intl';
+import {
+  Calendar,
+  ChevronDown,
+  Clock,
+  Download,
+  Eye,
+  FileCode,
+  Loader2,
+  Trash2,
+} from 'lucide-react';
 import {
   DOCUMENT_TOPIC_LABELS_BG,
   DOCUMENT_TYPE_LABELS_BG,
@@ -12,6 +22,9 @@ interface DocumentCatalogListProps {
   readonly items: readonly CatalogDocumentItem[];
   readonly selectedIds: readonly string[];
   readonly isLoading: boolean;
+  readonly hasNextPage: boolean;
+  readonly isFetchingNextPage: boolean;
+  readonly onLoadMore: () => void;
   readonly onToggleSelect: (id: string) => void;
   readonly onToggleSelectAll: () => void;
   readonly onPreview: (doc: CatalogDocumentItem) => void;
@@ -23,16 +36,21 @@ export const DocumentCatalogList: React.FC<DocumentCatalogListProps> = ({
   items,
   selectedIds,
   isLoading,
+  hasNextPage,
+  isFetchingNextPage,
+  onLoadMore,
   onToggleSelect,
   onToggleSelectAll,
   onPreview,
   onDownloadSingle,
   onDeleteSingle,
 }) => {
+  const t = useTranslations('documents');
+
   if (isLoading && items.length === 0) {
     return (
       <p className="py-8 text-center text-sm font-mono text-zinc-500">
-        Търсене в Документния Сейф...
+        {t('loadingState')}
       </p>
     );
   }
@@ -42,11 +60,9 @@ export const DocumentCatalogList: React.FC<DocumentCatalogListProps> = ({
       <article className="rounded-3xl border border-zinc-850 bg-zinc-950/60 p-10 text-center backdrop-blur-xl">
         <FileCode className="mx-auto h-10 w-10 text-zinc-600 mb-3" aria-hidden="true" />
         <h3 className="text-base font-semibold text-zinc-200">
-          Няма намерени документи
+          {t('emptyState')}
         </h3>
-        <p className="mt-1 text-xs text-zinc-500">
-          Качете файлове чрез Drag & Drop по-горе или променете критериите за търсене.
-        </p>
+        <p className="mt-1 text-xs text-zinc-500">{t('emptyStateHint')}</p>
       </article>
     );
   }
@@ -171,6 +187,25 @@ export const DocumentCatalogList: React.FC<DocumentCatalogListProps> = ({
           );
         })}
       </div>
+
+      {hasNextPage && (
+        <div className="flex justify-center pt-2">
+          <button
+            type="button"
+            disabled={isFetchingNextPage}
+            onClick={onLoadMore}
+            aria-label={t('loadMoreButton')}
+            className="inline-flex items-center gap-2 rounded-xl border border-cyan-500/30 bg-zinc-900/90 px-5 py-2.5 text-xs font-bold text-cyan-300 hover:border-cyan-400 hover:bg-cyan-500/10 disabled:opacity-50 transition-all"
+          >
+            {isFetchingNextPage ? (
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <ChevronDown className="h-4 w-4" aria-hidden="true" />
+            )}
+            <span>{isFetchingNextPage ? t('loadingMoreButton') : t('loadMoreButton')}</span>
+          </button>
+        </div>
+      )}
     </section>
   );
 };

@@ -108,7 +108,7 @@ export const UploadReviewRow: React.FC<UploadReviewRowProps> = ({
         </p>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2.5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-2.5">
         <div className="sm:col-span-2">
           <label className="block text-[11px] font-mono text-zinc-400 mb-1">Заглавие</label>
           <input
@@ -175,6 +175,17 @@ export const UploadReviewRow: React.FC<UploadReviewRowProps> = ({
             aria-label={`Дата на документа за ${doc.originalFileName}`}
             value={draft.docDate}
             onChange={(e) => onChangeDraft({ ...draft, docDate: e.target.value })}
+            className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-2.5 py-1.5 text-xs text-white focus:border-cyan-500 focus:outline-none"
+          />
+        </div>
+
+        <div>
+          <label className="block text-[11px] font-mono text-zinc-400 mb-1">Краен срок</label>
+          <input
+            type="date"
+            aria-label={`Краен срок за ${doc.originalFileName}`}
+            value={draft.expiresAt}
+            onChange={(e) => onChangeDraft({ ...draft, expiresAt: e.target.value })}
             className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-2.5 py-1.5 text-xs text-white focus:border-cyan-500 focus:outline-none"
           />
         </div>

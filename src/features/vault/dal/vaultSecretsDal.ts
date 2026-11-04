@@ -135,14 +135,15 @@ export const updateVaultSecret = async (
       updatePayload.value_encrypted = encryptAesGcm(validated.secretValue, vaultKey);
     }
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('vault_items')
       .update(updatePayload)
       .eq('id', validated.id)
       .eq('owner_id', userId)
-      .eq('is_secret', true);
+      .eq('is_secret', true)
+      .select('id');
 
-    if (error) {
+    if (error || !data || data.length === 0) {
       throw new Error('Неуспешна промяна на паролата.');
     }
   } catch (err) {

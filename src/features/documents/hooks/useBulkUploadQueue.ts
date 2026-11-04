@@ -30,6 +30,11 @@ export interface UploadQueueTask {
   readonly documentId?: string;
 }
 
+export interface EnqueueFilesResult {
+  readonly uploadedCount: number;
+  readonly failedCount: number;
+}
+
 const UPLOAD_CONCURRENCY = 3;
 const OCR_CONCURRENCY = 2;
 
@@ -70,133 +75,159 @@ export const useBulkUploadQueue = () => {
   );
 
   const enqueueFiles = useCallback(
-    async (rawFiles: readonly File[]) => {
-      if (rawFiles.length === 0) return;
+    async (rawFiles: readonly File[]): Promise<EnqueueFilesResult> => {
+      if (rawFiles.length === 0) {
+        return { uploadedCount: 0, failedCount: 0 };
+      }
+
       setIsProcessingBatch(true);
+      try {
+        const prepared = rawFiles.map((file) => ({
+          localId: globalThis.crypto.randomUUID(),
+          file,
+        }));
 
-      const prepared = rawFiles.map((file) => ({
-        localId: globalThis.crypto.randomUUID(),
-        file,
-      }));
+        setTasks((prev) => [
+          ...prepared.map(({ localId, file }) => ({
+            localId,
+            fileName: file.name,
+            fileSizeBytes: file.size,
+            step: 'queued' as const,
+            detailMessage: null,
+          })),
+          ...prev,
+        ]);
 
-      setTasks((prev) => [
-        ...prepared.map(({ localId, file }) => ({
-          localId,
-          fileName: file.name,
-          fileSizeBytes: file.size,
-          step: 'queued' as const,
-          detailMessage: null,
-        })),
-        ...prev,
-      ]);
+        const uploadedForOcr: Array<{ localId: string; documentId: string }> = [];
+        let failedCount = 0;
 
-      const uploadedForOcr: Array<{ localId: string; documentId: string }> = [];
-
-      await runBoundedConcurrency(
-        prepared,
-        UPLOAD_CONCURRENCY,
-        async ({ localId, file }) => {
-          if (file.size <= 0 || file.size > MAX_FILE_SIZE_BYTES) {
-            patchTask(localId, {
-              step: 'error',
-              detailMessage: 'Файлът трябва да е между 1 байт и 50 MB.',
-            });
-            return;
-          }
-
-          if (!ALLOWED_MIME_TYPES.includes(file.type as AllowedMimeType)) {
-            patchTask(localId, {
-              step: 'error',
-              detailMessage: 'Разрешени са само PDF, JPEG, PNG и WebP.',
-            });
-            return;
-          }
-
-          patchTask(localId, { step: 'uploading', detailMessage: 'Качване в сейфа...' });
-
-          try {
-            const signedRes = await requestDocumentUploadUrlAction({
-              fileName: file.name,
-              fileSizeBytes: file.size,
-              mimeType: file.type,
-            });
-
-            if (!signedRes.ok) {
-              throw new Error(signedRes.errorMessage);
+        await runBoundedConcurrency(
+          prepared,
+          UPLOAD_CONCURRENCY,
+          async ({ localId, file }) => {
+            if (file.size <= 0 || file.size > MAX_FILE_SIZE_BYTES) {
+              failedCount += 1;
+              patchTask(localId, {
+                step: 'error',
+                detailMessage: 'Файлът трябва да е между 1 байт и 50 MB.',
+              });
+              return;
             }
 
-            await uploadFileToSignedVaultUrl(
-              signedRes.data.storagePath,
-              signedRes.data.token,
-              file,
-              file.type
+            if (!ALLOWED_MIME_TYPES.includes(file.type as AllowedMimeType)) {
+              failedCount += 1;
+              patchTask(localId, {
+                step: 'error',
+                detailMessage: 'Разрешени са само PDF, JPEG, PNG и WebP.',
+              });
+              return;
+            }
+
+            patchTask(localId, {
+              step: 'uploading',
+              detailMessage: 'Качване в сейфа...',
+            });
+
+            try {
+              const signedRes = await requestDocumentUploadUrlAction({
+                fileName: file.name,
+                fileSizeBytes: file.size,
+                mimeType: file.type,
+              });
+
+              if (!signedRes.ok) {
+                throw new Error(signedRes.errorMessage);
+              }
+
+              await uploadFileToSignedVaultUrl(
+                signedRes.data.bucket,
+                signedRes.data.storagePath,
+                signedRes.data.token,
+                file,
+                file.type
+              );
+
+              const regRes = await registerUploadedDocumentAction({
+                storagePath: signedRes.data.storagePath,
+                originalFileName: file.name,
+                mimeType: file.type,
+                fileSizeBytes: file.size,
+              });
+
+              if (!regRes.ok) {
+                throw new Error(regRes.errorMessage);
+              }
+
+              uploadedForOcr.push({ localId, documentId: regRes.data.id });
+              patchTask(localId, {
+                documentId: regRes.data.id,
+                detailMessage: 'В опашка за OCR & RAG вектори...',
+              });
+            } catch (err) {
+              failedCount += 1;
+              patchTask(localId, {
+                step: 'error',
+                detailMessage:
+                  err instanceof Error ? err.message : 'Грешка при качване.',
+              });
+            }
+          }
+        );
+
+        await queryClient.invalidateQueries({ queryKey: ['documents'] });
+
+        await runBoundedConcurrency(
+          uploadedForOcr,
+          OCR_CONCURRENCY,
+          async ({ localId, documentId }) => {
+            patchTask(localId, {
+              step: 'analyzing',
+              detailMessage: 'OCR анализ (DE/BG/EL) + RAG вектор...',
+            });
+
+            const ocrRes = await processDocumentOcrAction({ id: documentId }).catch(
+              (): { readonly ok: false; readonly errorMessage: string } => ({
+                ok: false,
+                errorMessage: 'Грешка при стартиране на OCR анализа.',
+              })
             );
 
-            const regRes = await registerUploadedDocumentAction({
-              storagePath: signedRes.data.storagePath,
-              originalFileName: file.name,
-              mimeType: file.type,
-              fileSizeBytes: file.size,
-            });
-
-            if (!regRes.ok) {
-              throw new Error(regRes.errorMessage);
+            if (!ocrRes.ok || ocrRes.data.status === 'failed') {
+              patchTask(localId, {
+                step: 'completed',
+                detailMessage:
+                  ocrRes.ok && ocrRes.data.aiError
+                    ? `Качен (ръчен преглед): ${ocrRes.data.aiError}`
+                    : 'Качен за ръчен преглед.',
+              });
+            } else {
+              patchTask(localId, {
+                step: 'completed',
+                detailMessage: 'Готов за одобрение!',
+              });
             }
 
-            uploadedForOcr.push({ localId, documentId: regRes.data.id });
-            patchTask(localId, {
-              documentId: regRes.data.id,
-              detailMessage: 'В опашка за OCR & RAG вектори...',
-            });
-          } catch (err) {
-            patchTask(localId, {
-              step: 'error',
-              detailMessage:
-                err instanceof Error ? err.message : 'Грешка при качване.',
-            });
+            await queryClient.invalidateQueries({ queryKey: ['documents'] });
           }
-        }
-      );
+        );
 
-      await queryClient.invalidateQueries({ queryKey: ['documents'] });
-
-      await runBoundedConcurrency(
-        uploadedForOcr,
-        OCR_CONCURRENCY,
-        async ({ localId, documentId }) => {
-          patchTask(localId, {
-            step: 'analyzing',
-            detailMessage: 'OCR анализ (DE/BG/EL) + RAG вектор...',
-          });
-
-          const ocrRes = await processDocumentOcrAction({ id: documentId });
-          if (!ocrRes.ok || ocrRes.data.status === 'failed') {
-            patchTask(localId, {
-              step: 'completed',
-              detailMessage:
-                ocrRes.ok && ocrRes.data.aiError
-                  ? `Качен (ръчен преглед): ${ocrRes.data.aiError}`
-                  : 'Качен за ръчен преглед.',
-            });
-          } else {
-            patchTask(localId, {
-              step: 'completed',
-              detailMessage: 'Готов за одобрение!',
-            });
-          }
-
-          await queryClient.invalidateQueries({ queryKey: ['documents'] });
-        }
-      );
-
-      setIsProcessingBatch(false);
+        return {
+          uploadedCount: uploadedForOcr.length,
+          failedCount,
+        };
+      } finally {
+        setIsProcessingBatch(false);
+      }
     },
     [patchTask, queryClient]
   );
 
   const clearFinishedTasks = useCallback(() => {
     setTasks((prev) =>
-      prev.filter((t) => t.step === 'queued' || t.step === 'uploading' || t.step === 'analyzing')
+      prev.filter(
+        (t) =>
+          t.step === 'queued' || t.step === 'uploading' || t.step === 'analyzing'
+      )
     );
   }, []);
 

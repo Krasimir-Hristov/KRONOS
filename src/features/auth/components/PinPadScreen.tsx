@@ -2,10 +2,12 @@
 
 import React, { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { Delete, KeyRound, Lock, RotateCcw, ShieldAlert } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import {
-  lockPinAction,
   setupOrVerifyPinAction,
+  signOutAction,
   verifyStepUpPinAction,
 } from '../dal/authActions';
 
@@ -21,6 +23,8 @@ export const PinPadScreen: React.FC<PinPadScreenProps> = ({
   onSuccess,
 }) => {
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const t = useTranslations('auth');
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [isConfirmingSetup, setIsConfirmingSetup] = useState(false);
@@ -38,12 +42,10 @@ export const PinPadScreen: React.FC<PinPadScreenProps> = ({
           setPin(next);
           if (next.length === 4) setIsConfirmingSetup(true);
         }
-      } else {
-        if (confirmPin.length < 4) {
-          const next = confirmPin + digit;
-          setConfirmPin(next);
-          if (next.length === 4) triggerSetup(pin, next);
-        }
+      } else if (confirmPin.length < 4) {
+        const next = confirmPin + digit;
+        setConfirmPin(next);
+        if (next.length === 4) triggerSetup(pin, next);
       }
       return;
     }
@@ -76,6 +78,13 @@ export const PinPadScreen: React.FC<PinPadScreenProps> = ({
     setConfirmPin('');
     setIsConfirmingSetup(false);
     setErrorMessage(null);
+  };
+
+  const handleSwitchAccount = () => {
+    startTransition(async () => {
+      queryClient.clear();
+      await signOutAction();
+    });
   };
 
   const triggerVerify = (code: string) => {
@@ -131,33 +140,37 @@ export const PinPadScreen: React.FC<PinPadScreenProps> = ({
 
   const activeInput = !initialHasPin && !isStepUp && isConfirmingSetup ? confirmPin : pin;
 
+  const headingText = isStepUp
+    ? t('stepUpTitle')
+    : !initialHasPin
+      ? isConfirmingSetup
+        ? t('pinConfirmLabel')
+        : t('pinSetupTitle')
+      : t('pinTitle');
+
+  const subtitleText = isStepUp
+    ? t('stepUpSubtitle')
+    : !initialHasPin
+      ? isConfirmingSetup
+        ? t('pinConfirmSubtitle')
+        : t('pinSetupSubtitle')
+      : t('pinSubtitle');
+
   return (
     <div className="w-full max-w-sm mx-auto p-4 sm:p-0">
       <div className="relative rounded-3xl border border-zinc-800/80 bg-zinc-950/85 p-6 sm:p-8 shadow-2xl text-center backdrop-blur-2xl overflow-hidden">
         <div className="pointer-events-none absolute -top-20 -right-20 h-40 w-40 rounded-full bg-cyan-500/10 blur-3xl" />
 
         <div className="flex h-14 w-14 mx-auto items-center justify-center rounded-2xl bg-cyan-500/10 border border-cyan-500/25 text-cyan-400 mb-4 shadow-lg shadow-cyan-500/10">
-          {isStepUp ? <KeyRound className="h-6 w-6" aria-hidden="true" /> : <Lock className="h-6 w-6" aria-hidden="true" />}
+          {isStepUp ? (
+            <KeyRound className="h-6 w-6" aria-hidden="true" />
+          ) : (
+            <Lock className="h-6 w-6" aria-hidden="true" />
+          )}
         </div>
 
-        <h1 className="text-lg font-bold tracking-tight text-white">
-          {isStepUp
-            ? 'Step-Up ПИН за Пароли'
-            : !initialHasPin
-              ? isConfirmingSetup
-                ? 'Потвърдете ПИН'
-                : 'Създайте 4-цифрен ПИН'
-              : 'Въведете 4-цифрен ПИН'}
-        </h1>
-        <p className="mt-1.5 text-xs text-zinc-400">
-          {isStepUp
-            ? 'Потвърдете вашия ПИН за отключване на криптираните тайни.'
-            : !initialHasPin
-              ? isConfirmingSetup
-                ? 'Въведете същите 4 цифри още веднъж.'
-                : 'Задайте 4 цифри за бърз защитен достъп.'
-              : 'Отключва се мигновено на 4-тата цифра.'}
-        </p>
+        <h1 className="text-lg font-bold tracking-tight text-white">{headingText}</h1>
+        <p className="mt-1.5 text-xs text-zinc-400">{subtitleText}</p>
 
         {errorMessage && (
           <div
@@ -169,7 +182,7 @@ export const PinPadScreen: React.FC<PinPadScreenProps> = ({
           </div>
         )}
 
-        <div className="flex justify-center gap-4 my-6" aria-label="Индикатор за въведени цифри">
+        <div className="flex justify-center gap-4 my-6" aria-label={t('pinDotsLabel')}>
           {[0, 1, 2, 3].map((index) => {
             const isFilled = index < activeInput.length;
             return (
@@ -191,7 +204,7 @@ export const PinPadScreen: React.FC<PinPadScreenProps> = ({
               key={digit}
               type="button"
               disabled={isPending}
-              aria-label={`Цифра ${digit}`}
+              aria-label={t('pinDigitLabel', { digit })}
               onClick={() => handleDigit(digit)}
               className="h-13 rounded-2xl bg-zinc-900/90 border border-zinc-800 text-lg font-mono font-bold text-white hover:bg-zinc-800 hover:border-cyan-500/40 hover:text-cyan-300 active:scale-95 disabled:opacity-50 transition-all shadow-xs"
             >
@@ -201,7 +214,7 @@ export const PinPadScreen: React.FC<PinPadScreenProps> = ({
           <button
             type="button"
             disabled={isPending}
-            aria-label="Изчисти всичко"
+            aria-label={t('pinClearAll')}
             onClick={handleClear}
             className="h-13 rounded-2xl bg-zinc-900/40 border border-zinc-850 text-zinc-500 flex items-center justify-center hover:text-zinc-200 hover:bg-zinc-850 active:scale-95 transition-all"
           >
@@ -210,7 +223,7 @@ export const PinPadScreen: React.FC<PinPadScreenProps> = ({
           <button
             type="button"
             disabled={isPending}
-            aria-label="Цифра 0"
+            aria-label={t('pinDigitLabel', { digit: '0' })}
             onClick={() => handleDigit('0')}
             className="h-13 rounded-2xl bg-zinc-900/90 border border-zinc-800 text-lg font-mono font-bold text-white hover:bg-zinc-800 hover:border-cyan-500/40 hover:text-cyan-300 active:scale-95 disabled:opacity-50 transition-all shadow-xs"
           >
@@ -219,7 +232,7 @@ export const PinPadScreen: React.FC<PinPadScreenProps> = ({
           <button
             type="button"
             disabled={isPending}
-            aria-label="Изтрий последна цифра"
+            aria-label={t('pinDeleteDigit')}
             onClick={handleDelete}
             className="h-13 rounded-2xl bg-zinc-900/40 border border-zinc-850 text-zinc-500 flex items-center justify-center hover:text-zinc-200 hover:bg-zinc-850 active:scale-95 transition-all"
           >
@@ -231,11 +244,12 @@ export const PinPadScreen: React.FC<PinPadScreenProps> = ({
           <div className="mt-6 pt-4 border-t border-zinc-800/80 flex justify-center">
             <button
               type="button"
-              onClick={() => lockPinAction()}
-              aria-label="Вход с друг профил"
-              className="text-xs font-mono text-zinc-500 hover:text-cyan-400 transition-colors"
+              disabled={isPending}
+              onClick={handleSwitchAccount}
+              aria-label={t('switchAccountAria')}
+              className="text-xs font-mono text-zinc-400 hover:text-cyan-400 disabled:opacity-50 transition-colors"
             >
-              ← Вход с друг профил
+              {t('switchAccount')}
             </button>
           </div>
         )}

@@ -1,24 +1,26 @@
 import { createBrowserSupabaseClient } from '@/lib/supabase/supabaseBrowser';
 
-const DEFAULT_STORAGE_BUCKET = 'kronos-vault';
-
 export const uploadFileToSignedVaultUrl = async (
+  bucketName: string,
   storagePath: string,
   token: string,
   file: Blob,
   mimeType: string
 ): Promise<void> => {
   try {
+    if (!bucketName.trim()) {
+      throw new Error('Липсва конфигуриран bucket за качване.');
+    }
     const supabase = createBrowserSupabaseClient();
     const { error } = await supabase.storage
-      .from(DEFAULT_STORAGE_BUCKET)
+      .from(bucketName)
       .uploadToSignedUrl(storagePath, token, file, {
         contentType: mimeType,
         upsert: false,
       });
 
     if (error) {
-      throw new Error(error.message || 'Неуспешно директно качване на файла в сейфа.');
+      throw new Error('Неуспешно директно качване на файла в сейфа.');
     }
   } catch (err) {
     const msg =

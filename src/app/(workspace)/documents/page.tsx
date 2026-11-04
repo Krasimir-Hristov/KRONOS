@@ -1,7 +1,11 @@
 import React from 'react';
 import type { Metadata } from 'next';
 import { requireAuthAndPin } from '@/features/auth/server';
-import { DocumentsWorkspace, type CatalogDocumentItem } from '@/features/documents';
+import {
+  CLASSIC_SEARCH_PAGE_SIZE,
+  DocumentsWorkspace,
+  type CatalogDocumentItem,
+} from '@/features/documents';
 import {
   listReviewQueueDocuments,
   searchCatalogDocumentsClassic,
@@ -18,30 +22,60 @@ interface DocumentsPageProps {
 }
 
 const loadInitialDocumentsData = async (): Promise<{
-  readonly initialCatalog: readonly CatalogDocumentItem[];
-  readonly initialReviewQueue: readonly CatalogDocumentItem[];
+  readonly initialCatalog?: readonly CatalogDocumentItem[];
+  readonly initialReviewQueue?: readonly CatalogDocumentItem[];
+  readonly initialLoadError: string | null;
 }> => {
-  try {
-    const [initialCatalog, initialReviewQueue] = await Promise.all([
-      searchCatalogDocumentsClassic({ query: '', sortBy: 'doc_date_desc' }),
-      listReviewQueueDocuments(),
-    ]);
-    return { initialCatalog, initialReviewQueue };
-  } catch {
-    return { initialCatalog: [], initialReviewQueue: [] };
+  const [catalogResult, reviewResult] = await Promise.allSettled([
+    searchCatalogDocumentsClassic({
+      query: '',
+      sortBy: 'doc_date_desc',
+      limit: CLASSIC_SEARCH_PAGE_SIZE,
+      offset: 0,
+    }),
+    listReviewQueueDocuments(),
+  ]);
+
+  const errors: string[] = [];
+  let initialCatalog: readonly CatalogDocumentItem[] | undefined;
+  let initialReviewQueue: readonly CatalogDocumentItem[] | undefined;
+
+  if (catalogResult.status === 'fulfilled') {
+    initialCatalog = catalogResult.value;
+  } else {
+    console.error('[DocumentsPage] Failed to load initial catalog:', catalogResult.reason);
+    errors.push('Неуспешно зареждане на каталога с документи.');
   }
+
+  if (reviewResult.status === 'fulfilled') {
+    initialReviewQueue = reviewResult.value;
+  } else {
+    console.error(
+      '[DocumentsPage] Failed to load initial review queue:',
+      reviewResult.reason
+    );
+    errors.push('Неуспешно зареждане на опашката за преглед.');
+  }
+
+  return {
+    initialCatalog,
+    initialReviewQueue,
+    initialLoadError: errors.length > 0 ? errors.join(' ') : null,
+  };
 };
 
 const DocumentsPage: React.FC<DocumentsPageProps> = async ({ searchParams }) => {
   await requireAuthAndPin();
   const params = await searchParams;
   const previewDocId = typeof params.preview === 'string' ? params.preview : null;
-  const { initialCatalog, initialReviewQueue } = await loadInitialDocumentsData();
+  const { initialCatalog, initialReviewQueue, initialLoadError } =
+    await loadInitialDocumentsData();
 
   return (
     <DocumentsWorkspace
       initialCatalog={initialCatalog}
       initialReviewQueue={initialReviewQueue}
+      initialLoadError={initialLoadError}
       initialPreviewDocId={previewDocId}
     />
   );

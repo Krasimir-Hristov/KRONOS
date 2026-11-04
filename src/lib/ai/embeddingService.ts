@@ -5,6 +5,7 @@ import {
   getAiModelsConfig,
   OPENROUTER_ENDPOINTS,
 } from '@/config/aiModelsConfig';
+import { redactSecretsFromFreeText } from '@/lib/security/secretFactGuard';
 
 const MAX_EMBEDDING_CHAR_LENGTH = 18_000;
 
@@ -40,8 +41,11 @@ export const buildDocumentEmbeddingInput = (source: DocumentEmbeddingSource): st
     .filter(Boolean)
     .join('\n');
 
-  const bodySnippet = source.rawOcrText.trim().slice(0, MAX_EMBEDDING_CHAR_LENGTH);
-  return bodySnippet ? `${headerLines}\n\nТекст:\n${bodySnippet}` : headerLines;
+  const bodySnippet = redactSecretsFromFreeText(
+    source.rawOcrText.trim().slice(0, MAX_EMBEDDING_CHAR_LENGTH)
+  );
+  const safeHeaders = redactSecretsFromFreeText(headerLines);
+  return bodySnippet ? `${safeHeaders}\n\nТекст:\n${bodySnippet}` : safeHeaders;
 };
 
 export const serializePgVector = (vector: readonly number[]): string => {

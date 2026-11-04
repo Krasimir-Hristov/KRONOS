@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useTranslations } from 'next-intl';
 import { Archive, CloudUpload, FileStack, Loader2, Trash2, X } from 'lucide-react';
 
 interface BulkSelectionBarProps {
@@ -24,6 +25,8 @@ export const BulkSelectionBar: React.FC<BulkSelectionBarProps> = ({
   onMergePdfAndSaveToVault,
   onPurgeSelected,
 }) => {
+  const t = useTranslations('documents');
+
   if (selectedCount === 0) {
     return null;
   }
@@ -40,7 +43,7 @@ export const BulkSelectionBar: React.FC<BulkSelectionBarProps> = ({
           </span>
           <div>
             <p className="text-xs sm:text-sm font-bold text-white tracking-wide">
-              Избрани документи за експорт / портал
+              {t('selectedForPortal')}
             </p>
             {statusMessage && (
               <p className="inline-flex items-center gap-1.5 text-xs font-mono text-cyan-300">
@@ -60,7 +63,7 @@ export const BulkSelectionBar: React.FC<BulkSelectionBarProps> = ({
             className="inline-flex items-center gap-1.5 rounded-xl bg-linear-to-r from-cyan-500 via-indigo-600 to-violet-600 px-3.5 py-2 text-xs font-bold text-white shadow-md shadow-cyan-500/20 hover:brightness-110 active:scale-95 disabled:opacity-50 transition-all"
           >
             <Archive className="h-3.5 w-3.5" aria-hidden="true" />
-            <span>Свали отделни (.ZIP)</span>
+            <span>{t('downloadZipButton')}</span>
           </button>
 
           <button
@@ -71,7 +74,7 @@ export const BulkSelectionBar: React.FC<BulkSelectionBarProps> = ({
             className="inline-flex items-center gap-1.5 rounded-xl border border-sky-500/40 bg-sky-500/15 px-3.5 py-2 text-xs font-bold text-sky-200 hover:bg-sky-500/25 active:scale-95 disabled:opacity-50 transition-all"
           >
             <FileStack className="h-3.5 w-3.5" aria-hidden="true" />
-            <span>Обедини избраните в 1 PDF</span>
+            <span>{t('mergePdfButton')}</span>
           </button>
 
           <button
@@ -82,7 +85,7 @@ export const BulkSelectionBar: React.FC<BulkSelectionBarProps> = ({
             className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-500/40 bg-emerald-500/15 px-3.5 py-2 text-xs font-semibold text-emerald-200 hover:bg-emerald-500/25 active:scale-95 disabled:opacity-50 transition-all"
           >
             <CloudUpload className="h-3.5 w-3.5" aria-hidden="true" />
-            <span>+ Запази копие в сейфа</span>
+            <span>{t('mergeAndSaveVaultButton')}</span>
           </button>
 
           <button
@@ -93,7 +96,7 @@ export const BulkSelectionBar: React.FC<BulkSelectionBarProps> = ({
             className="inline-flex items-center gap-1 rounded-xl border border-rose-500/35 bg-rose-500/10 px-3 py-2 text-xs font-semibold text-rose-300 hover:bg-rose-500/20 active:scale-95 disabled:opacity-50 transition-all"
           >
             <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-            <span>Изтрий</span>
+            <span>{t('deleteSelectedButton')}</span>
           </button>
 
           <button

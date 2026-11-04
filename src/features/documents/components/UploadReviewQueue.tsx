@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { CheckCheck, Sparkles } from 'lucide-react';
 import type {
   ApproveDocumentItemInput,
@@ -8,11 +9,25 @@ import type {
 } from '../schemas/documentSchema';
 import { UploadReviewRow, type ReviewDraftState } from './UploadReviewRow';
 
+const MAX_APPROVE_BATCH_SIZE = 50;
+
+export interface ApproveBatchResult {
+  readonly approvedCount: number;
+  readonly savedFactsCount: number;
+}
+
+export interface ApproveOutcomeSummary extends ApproveBatchResult {
+  readonly errorMessage: string | null;
+}
+
 interface UploadReviewQueueProps {
   readonly items: readonly CatalogDocumentItem[];
   readonly isApproving: boolean;
   readonly isRetryingOcr: boolean;
-  readonly onApproveBatch: (payload: readonly ApproveDocumentItemInput[]) => Promise<void>;
+  readonly onApproveBatch: (
+    payload: readonly ApproveDocumentItemInput[]
+  ) => Promise<ApproveBatchResult>;
+  readonly onApproveOutcome: (outcome: ApproveOutcomeSummary) => void;
   readonly onRetryOcr: (documentId: string) => Promise<void>;
   readonly onPreview: (doc: CatalogDocumentItem) => void;
   readonly onDelete: (documentId: string) => Promise<void>;
@@ -33,10 +48,12 @@ export const UploadReviewQueue: React.FC<UploadReviewQueueProps> = ({
   isApproving,
   isRetryingOcr,
   onApproveBatch,
+  onApproveOutcome,
   onRetryOcr,
   onPreview,
   onDelete,
 }) => {
+  const t = useTranslations('documents');
   const [overrides, setOverrides] = useState<Record<string, ReviewDraftState>>({});
 
   if (items.length === 0) {
@@ -64,9 +81,46 @@ export const UploadReviewQueue: React.FC<UploadReviewQueueProps> = ({
     };
   };
 
-  const handleApproveAll = async () => {
-    const batch = items.map(toApproveInput);
-    await onApproveBatch(batch);
+  const handleApproveSingle = async (doc: CatalogDocumentItem): Promise<void> => {
+    try {
+      const res = await onApproveBatch([toApproveInput(doc)]);
+      onApproveOutcome({
+        approvedCount: res.approvedCount,
+        savedFactsCount: res.savedFactsCount,
+        errorMessage: null,
+      });
+    } catch (err) {
+      onApproveOutcome({
+        approvedCount: 0,
+        savedFactsCount: 0,
+        errorMessage: err instanceof Error ? err.message : 'Грешка при одобрение.',
+      });
+    }
+  };
+
+  const handleApproveAll = async (): Promise<void> => {
+    const allInputs = items.map(toApproveInput);
+    let totalApproved = 0;
+    let totalSavedFacts = 0;
+    let failureMessage: string | null = null;
+
+    for (let i = 0; i < allInputs.length; i += MAX_APPROVE_BATCH_SIZE) {
+      const chunk = allInputs.slice(i, i + MAX_APPROVE_BATCH_SIZE);
+      try {
+        const res = await onApproveBatch(chunk);
+        totalApproved += res.approvedCount;
+        totalSavedFacts += res.savedFactsCount;
+      } catch (err) {
+        failureMessage = err instanceof Error ? err.message : 'Грешка при одобрение.';
+        break;
+      }
+    }
+
+    onApproveOutcome({
+      approvedCount: totalApproved,
+      savedFactsCount: totalSavedFacts,
+      errorMessage: failureMessage,
+    });
   };
 
   return (
@@ -79,12 +133,10 @@ export const UploadReviewQueue: React.FC<UploadReviewQueueProps> = ({
           <div className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-cyan-400" aria-hidden="true" />
             <h2 className="text-base sm:text-lg font-bold text-white tracking-wide">
-              Чакащи преглед и одобрение ({items.length})
+              {t('reviewQueueTitle', { count: items.length })}
             </h2>
           </div>
-          <p className="text-xs text-zinc-400 mt-0.5">
-            AI извлече тези метаданни и факти. Проверете ги или натиснете „Одобри всички“.
-          </p>
+          <p className="text-xs text-zinc-400 mt-0.5">{t('reviewQueueSubtitle')}</p>
         </div>
 
         <button
@@ -95,7 +147,11 @@ export const UploadReviewQueue: React.FC<UploadReviewQueueProps> = ({
           className="inline-flex items-center justify-center gap-2 rounded-xl bg-linear-to-r from-emerald-500 via-teal-600 to-cyan-600 px-5 py-2.5 text-xs sm:text-sm font-bold text-white shadow-lg shadow-emerald-500/25 hover:brightness-110 active:scale-95 disabled:opacity-50 transition-all"
         >
           <CheckCheck className="h-4 w-4" aria-hidden="true" />
-          <span>{isApproving ? 'Одобряване...' : `✅ Одобри всички (${items.length})`}</span>
+          <span>
+            {isApproving
+              ? t('approvingButton')
+              : t('approveAllButton', { count: items.length })}
+          </span>
         </button>
       </header>
 
@@ -109,7 +165,7 @@ export const UploadReviewQueue: React.FC<UploadReviewQueueProps> = ({
             onChangeDraft={(next) =>
               setOverrides((prev) => ({ ...prev, [doc.id]: next }))
             }
-            onApproveSingle={() => void onApproveBatch([toApproveInput(doc)])}
+            onApproveSingle={() => void handleApproveSingle(doc)}
             onRetryOcr={() => void onRetryOcr(doc.id)}
             onPreview={() => onPreview(doc)}
             onDelete={() => void onDelete(doc.id)}

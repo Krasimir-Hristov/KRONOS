@@ -1,6 +1,6 @@
 import 'server-only';
 import { requireAuthAndPin } from '@/features/auth/server';
-import { purgeVaultStorageObjects } from '@/features/storage/server';
+import { getVaultObjectMetadata } from '@/features/storage/server';
 import { saveApprovedFactsDeduplicated } from '@/features/vault/server';
 import { createServerSupabaseClient } from '@/lib/supabase/supabaseServer';
 import type { Json } from '@/types/databaseTypes';
@@ -25,6 +25,16 @@ export const registerPendingDocument = async (
 
     if (!validated.storagePath.startsWith(`${userId}/`)) {
       throw new Error('Неоторизиран път към файла в сториджа.');
+    }
+
+    const storedObject = await getVaultObjectMetadata(validated.storagePath);
+    if (
+      storedObject.sizeBytes !== validated.fileSizeBytes ||
+      storedObject.mimeType !== validated.mimeType
+    ) {
+      throw new Error(
+        'Метаданните на качения файл не съответстват на обекта в хранилището.'
+      );
     }
 
     const fallbackTitle =
@@ -81,13 +91,37 @@ export const approveDocumentsBatch = async (
     let savedFactsCount = 0;
 
     for (const item of validated.items) {
+      const { data: ownedDoc, error: ownerErr } = await supabase
+        .from('documents')
+        .select('id')
+        .eq('id', item.id)
+        .eq('owner_id', userId)
+        .maybeSingle();
+
+      if (ownerErr) {
+        throw new Error('Грешка при проверка на собствеността върху документа.');
+      }
+
+      if (!ownedDoc) {
+        continue;
+      }
+
+      let itemInsertedFacts = 0;
+      if (item.selectedFacts.length > 0) {
+        const dedupRes = await saveApprovedFactsDeduplicated(
+          item.id,
+          item.selectedFacts
+        );
+        itemInsertedFacts = dedupRes.insertedCount;
+      }
+
       const cleanMeta: Json = {
         pendingReview: false,
         suggestedFacts: [],
         aiError: null,
       };
 
-      const { error } = await supabase
+      const { data: updatedRows, error: updateErr } = await supabase
         .from('documents')
         .update({
           title: item.title,
@@ -100,17 +134,16 @@ export const approveDocumentsBatch = async (
           metadata: cleanMeta,
         })
         .eq('id', item.id)
-        .eq('owner_id', userId);
+        .eq('owner_id', userId)
+        .select('id');
 
-      if (!error) {
+      if (updateErr) {
+        throw new Error('Грешка при финализиране на одобрението на документа.');
+      }
+
+      if (updatedRows && updatedRows.length > 0) {
         approvedCount += 1;
-        if (item.selectedFacts.length > 0) {
-          const dedupRes = await saveApprovedFactsDeduplicated(
-            item.id,
-            item.selectedFacts
-          );
-          savedFactsCount += dedupRes.insertedCount;
-        }
+        savedFactsCount += itemInsertedFacts;
       }
     }
 
@@ -130,7 +163,7 @@ export const updateApprovedDocumentMetadata = async (
     const validated = updateDocumentMetaSchema.parse(input);
     const supabase = await createServerSupabaseClient();
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('documents')
       .update({
         title: validated.title,
@@ -141,60 +174,14 @@ export const updateApprovedDocumentMetadata = async (
         expires_at: validated.expiresAt,
       })
       .eq('id', validated.id)
-      .eq('owner_id', userId);
+      .eq('owner_id', userId)
+      .select('id');
 
-    if (error) {
+    if (error || !data || data.length === 0) {
       throw new Error('Неуспешно обновяване на метаданните на документа.');
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Грешка при редакция на документа.';
-    throw new Error(msg, { cause: err });
-  }
-};
-
-export const purgeDocumentsHard = async (
-  documentIds: readonly string[]
-): Promise<{ readonly purgedCount: number }> => {
-  try {
-    const { userId } = await requireAuthAndPin({ redirectOnFail: false });
-    if (documentIds.length === 0) {
-      return { purgedCount: 0 };
-    }
-
-    const supabase = await createServerSupabaseClient();
-    const { data: rows, error: selectErr } = await supabase
-      .from('documents')
-      .select('id, storage_path')
-      .eq('owner_id', userId)
-      .in('id', [...documentIds]);
-
-    if (selectErr) {
-      throw new Error('Грешка при проверка на документите преди изтриване.');
-    }
-
-    if (!rows || rows.length === 0) {
-      return { purgedCount: 0 };
-    }
-
-    await purgeVaultStorageObjects(rows.map((r) => r.storage_path));
-
-    const { error: deleteErr } = await supabase
-      .from('documents')
-      .delete()
-      .eq('owner_id', userId)
-      .in(
-        'id',
-        rows.map((r) => r.id)
-      );
-
-    if (deleteErr) {
-      throw new Error('Грешка при физическо заличаване от базата данни.');
-    }
-
-    return { purgedCount: rows.length };
-  } catch (err) {
-    const msg =
-      err instanceof Error ? err.message : 'Грешка при Hard Purge на документите.';
     throw new Error(msg, { cause: err });
   }
 };

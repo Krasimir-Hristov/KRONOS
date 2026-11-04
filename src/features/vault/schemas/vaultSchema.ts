@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isSuspectedSecretFact } from '@/lib/security/secretFactGuard';
 
 export const VAULT_CATEGORIES = [
   'personal',
@@ -45,12 +46,16 @@ export const vaultSecretUpdateSchema = z.object({
   usernameOrHint: z.string().trim().max(240).nullable().optional(),
 });
 
-export const extractedFactCandidateSchema = z.object({
-  label: z.string().trim().min(1).max(120),
-  value: z.string().trim().min(1).max(500),
-  category: vaultCategorySchema.catch('other'),
-  hint: z.string().trim().max(240).nullable().optional(),
-});
+export const extractedFactCandidateSchema = z
+  .object({
+    label: z.string().trim().min(1).max(120),
+    value: z.string().trim().min(1).max(500),
+    category: vaultCategorySchema.catch('other'),
+    hint: z.string().trim().max(240).nullable().optional(),
+  })
+  .refine((item) => !isSuspectedSecretFact(item.label, item.hint), {
+    message: 'Пароли и ПИН кодове се съхраняват само криптирани.',
+  });
 
 export type VaultFactInput = z.infer<typeof vaultFactInputSchema>;
 export type VaultFactUpdateInput = z.infer<typeof vaultFactUpdateSchema>;
@@ -80,9 +85,14 @@ export interface VaultSecretMaskedItem {
 
 const IBAN_COMPACT_REGEX = /^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/;
 const STEUER_ID_COMPACT_REGEX = /^\d{11}$/;
+const KINDERGELD_NR_COMPACT_REGEX = /^\d{3}FK\d{6}$/;
 
 export const normalizeCompactFactValue = (rawValue: string): string => {
   return rawValue.replace(/[\s\-./]+/g, '').toUpperCase();
+};
+
+export const normalizeGeneralFactValue = (rawValue: string): string => {
+  return rawValue.trim().replace(/\s+/g, ' ').toLowerCase();
 };
 
 export const normalizeFactLabel = (rawLabel: string): string => {
@@ -92,44 +102,56 @@ export const normalizeFactLabel = (rawLabel: string): string => {
     .replace(/\s+/g, ' ');
 };
 
-export const isGloballyUniqueIdentifierValue = (
+export const getStructuredIdentifierKey = (
   label: string,
   rawValue: string
-): boolean => {
+): string | null => {
   const compact = normalizeCompactFactValue(rawValue);
+  if (!compact) {
+    return null;
+  }
   if (IBAN_COMPACT_REGEX.test(compact)) {
-    return true;
+    return `id:iban:${compact}`;
+  }
+  if (KINDERGELD_NR_COMPACT_REGEX.test(compact)) {
+    return `id:kg:${compact}`;
   }
   const lowerLabel = normalizeFactLabel(label);
   if (
     STEUER_ID_COMPACT_REGEX.test(compact) &&
-    (lowerLabel.includes('steuer') || lowerLabel.includes('данъч') || lowerLabel.includes('idnr'))
+    (lowerLabel.includes('steuer') ||
+      lowerLabel.includes('данъч') ||
+      lowerLabel.includes('idnr'))
   ) {
-    return true;
+    return `id:steuer:${compact}`;
   }
-  if (lowerLabel.includes('kindergeld') && compact.length >= 8) {
-    return true;
+  return null;
+};
+
+export const isGloballyUniqueIdentifierValue = (
+  label: string,
+  rawValue: string
+): boolean => {
+  return getStructuredIdentifierKey(label, rawValue) !== null;
+};
+
+export const computeFactDedupKey = (label: string, rawValue: string): string => {
+  const structuredKey = getStructuredIdentifierKey(label, rawValue);
+  if (structuredKey) {
+    return structuredKey;
   }
-  return false;
+  return `pair:${normalizeFactLabel(label)}||${normalizeGeneralFactValue(rawValue)}`;
 };
 
 export const areFactsDuplicate = (
   existing: { readonly label: string; readonly value: string },
   candidate: { readonly label: string; readonly value: string }
 ): boolean => {
-  const existingCompact = normalizeCompactFactValue(existing.value);
-  const candidateCompact = normalizeCompactFactValue(candidate.value);
-
-  if (!existingCompact || existingCompact !== candidateCompact) {
+  if (!existing.value.trim() || !candidate.value.trim()) {
     return false;
   }
-
-  if (
-    isGloballyUniqueIdentifierValue(existing.label, existing.value) ||
-    isGloballyUniqueIdentifierValue(candidate.label, candidate.value)
-  ) {
-    return true;
-  }
-
-  return normalizeFactLabel(existing.label) === normalizeFactLabel(candidate.label);
+  return (
+    computeFactDedupKey(existing.label, existing.value) ===
+    computeFactDedupKey(candidate.label, candidate.value)
+  );
 };

@@ -1,11 +1,13 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   useVaultFactMutations,
   useVaultFactsQuery,
   useVaultSecretMutations,
   useVaultSecretsQuery,
+  VAULT_QUERY_KEYS,
 } from '../hooks/useVaultQueries';
 import type {
   VaultCategory,
@@ -18,16 +20,21 @@ import { VaultItemModal } from './VaultItemModal';
 import { VaultSecretsPanel } from './VaultSecretsPanel';
 
 interface VaultWorkspaceProps {
-  readonly initialFacts: readonly VaultFactItem[];
-  readonly initialStepUpUnlocked: boolean;
+  readonly initialFacts?: readonly VaultFactItem[];
+  readonly initialLoadError?: string | null;
+  readonly initialStepUpExpiresAtMs?: number | null;
 }
 
 export const VaultWorkspace: React.FC<VaultWorkspaceProps> = ({
   initialFacts,
-  initialStepUpUnlocked,
+  initialLoadError = null,
+  initialStepUpExpiresAtMs = null,
 }) => {
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<'facts' | 'secrets'>('facts');
-  const [isStepUpUnlocked, setIsStepUpUnlocked] = useState(initialStepUpUnlocked);
+  const [stepUpExpiresAtMs, setStepUpExpiresAtMs] = useState<number | null>(
+    initialStepUpExpiresAtMs
+  );
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<VaultCategory | 'all'>('all');
   const [modalOpen, setModalOpen] = useState(false);
@@ -35,11 +42,34 @@ export const VaultWorkspace: React.FC<VaultWorkspaceProps> = ({
   const [editingSecret, setEditingSecret] = useState<VaultSecretMaskedItem | null>(null);
   const [modalError, setModalError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  const handleStepUpExpired = () => {
-    setIsStepUpUnlocked(false);
+  const isStepUpUnlocked = stepUpExpiresAtMs !== null;
+
+  const handleStepUpExpired = useCallback(() => {
+    setStepUpExpiresAtMs(null);
     setModalOpen(false);
-  };
+    queryClient.removeQueries({ queryKey: VAULT_QUERY_KEYS.secrets });
+  }, [queryClient]);
+
+  useEffect(() => {
+    if (stepUpExpiresAtMs === null) return;
+
+    const checkExpiry = () => {
+      if (Date.now() >= stepUpExpiresAtMs) {
+        handleStepUpExpired();
+      }
+    };
+
+    const remainingMs = Math.max(0, stepUpExpiresAtMs - Date.now());
+    const timer = window.setTimeout(handleStepUpExpired, remainingMs);
+    document.addEventListener('visibilitychange', checkExpiry);
+
+    return () => {
+      window.clearTimeout(timer);
+      document.removeEventListener('visibilitychange', checkExpiry);
+    };
+  }, [stepUpExpiresAtMs, handleStepUpExpired]);
 
   const factsQuery = useVaultFactsQuery(initialFacts);
   const secretsQuery = useVaultSecretsQuery(
@@ -76,9 +106,16 @@ export const VaultWorkspace: React.FC<VaultWorkspaceProps> = ({
 
   const handleDeleteFact = async (item: VaultFactItem) => {
     if (!window.confirm(`Да се изтрие ли завинаги „${item.label}“ от KRONOS?`)) return;
+    setDeleteError(null);
     setDeletingId(item.id);
     try {
       await factMutations.deleteFact.mutateAsync(item.id);
+    } catch (err) {
+      setDeleteError(
+        err instanceof Error
+          ? `${err.message} Записът остава в сейфа.`
+          : 'Неуспешно изтриване. Записът остава в сейфа.'
+      );
     } finally {
       setDeletingId(null);
     }
@@ -86,65 +123,86 @@ export const VaultWorkspace: React.FC<VaultWorkspaceProps> = ({
 
   const handleDeleteSecret = async (item: VaultSecretMaskedItem) => {
     if (!window.confirm(`Да се изтрие ли завинаги криптираната парола „${item.label}“?`)) return;
+    setDeleteError(null);
     setDeletingId(item.id);
     try {
       await secretMutations.deleteSecret.mutateAsync(item.id);
+    } catch (err) {
+      setDeleteError(
+        err instanceof Error
+          ? `${err.message} Записът остава в сейфа.`
+          : 'Неуспешно изтриване на паролата. Записът остава в сейфа.'
+      );
     } finally {
       setDeletingId(null);
     }
   };
 
+  const factsLoadError =
+    factsQuery.error?.message ?? (factsQuery.data === undefined ? initialLoadError : null);
+
   return (
     <section aria-label="Лични Данни и Пароли" className="space-y-6">
-      <VaultFilterBar
-        activeTab={activeTab}
-        factsCount={factsQuery.data?.length ?? 0}
-        canCreate={activeTab === 'facts' || isStepUpUnlocked}
-        searchQuery={searchQuery}
-        selectedCategory={selectedCategory}
-        onTabChange={setActiveTab}
-        onSearchChange={setSearchQuery}
-        onCategoryChange={setSelectedCategory}
-        onOpenCreate={() => {
-          setEditingFact(null);
-          setEditingSecret(null);
-          setModalError(null);
-          setModalOpen(true);
-        }}
-      />
-
-      {activeTab === 'facts' ? (
-        <VaultFactsPanel
-          items={filteredFacts}
-          isDeletingId={deletingId}
-          onEdit={(fact) => {
-            setEditingFact(fact);
+      <div inert={modalOpen} className="space-y-6">
+        <VaultFilterBar
+          activeTab={activeTab}
+          factsCount={factsQuery.data?.length ?? 0}
+          canCreate={activeTab === 'facts' || isStepUpUnlocked}
+          searchQuery={searchQuery}
+          selectedCategory={selectedCategory}
+          onTabChange={(nextTab) => {
+            setDeleteError(null);
+            setActiveTab(nextTab);
+          }}
+          onSearchChange={setSearchQuery}
+          onCategoryChange={setSelectedCategory}
+          onOpenCreate={() => {
+            setEditingFact(null);
             setEditingSecret(null);
             setModalError(null);
             setModalOpen(true);
           }}
-          onDelete={(fact) => void handleDeleteFact(fact)}
         />
-      ) : (
-        <VaultSecretsPanel
-          isStepUpUnlocked={isStepUpUnlocked}
-          items={filteredSecrets}
-          isLoading={secretsQuery.isLoading}
-          isDeletingId={deletingId}
-          onUnlocked={() => {
-            setIsStepUpUnlocked(true);
-            void secretsQuery.refetch();
-          }}
-          onReveal={(id) => secretMutations.revealSecret.mutateAsync(id)}
-          onEdit={(secret) => {
-            setEditingSecret(secret);
-            setEditingFact(null);
-            setModalError(null);
-            setModalOpen(true);
-          }}
-          onDelete={(secret) => void handleDeleteSecret(secret)}
-        />
-      )}
+
+        {activeTab === 'facts' ? (
+          <VaultFactsPanel
+            items={filteredFacts}
+            isLoading={factsQuery.isLoading}
+            loadError={factsLoadError}
+            deleteError={deleteError}
+            isDeletingId={deletingId}
+            onEdit={(fact) => {
+              setEditingFact(fact);
+              setEditingSecret(null);
+              setModalError(null);
+              setModalOpen(true);
+            }}
+            onDelete={(fact) => void handleDeleteFact(fact)}
+          />
+        ) : (
+          <VaultSecretsPanel
+            key={isStepUpUnlocked ? 'unlocked' : 'locked'}
+            isStepUpUnlocked={isStepUpUnlocked}
+            items={filteredSecrets}
+            isLoading={secretsQuery.isLoading}
+            loadError={secretsQuery.error?.message ?? null}
+            deleteError={deleteError}
+            isDeletingId={deletingId}
+            onUnlocked={(expiresAtMs) => {
+              setDeleteError(null);
+              setStepUpExpiresAtMs(expiresAtMs);
+            }}
+            onReveal={(id) => secretMutations.revealSecret.mutateAsync(id)}
+            onEdit={(secret) => {
+              setEditingSecret(secret);
+              setEditingFact(null);
+              setModalError(null);
+              setModalOpen(true);
+            }}
+            onDelete={(secret) => void handleDeleteSecret(secret)}
+          />
+        )}
+      </div>
 
       {modalOpen && (
         <VaultItemModal

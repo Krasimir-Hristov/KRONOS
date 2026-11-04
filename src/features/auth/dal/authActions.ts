@@ -25,11 +25,16 @@ export type ActionResponse<T = Record<string, unknown>> =
   | { readonly ok: true; readonly data?: T }
   | { readonly ok: false; readonly errorMessage: string };
 
-export const signInAction = async (input: unknown): Promise<ActionResponse<{ readonly hasPin: boolean }>> => {
+export const signInAction = async (
+  input: unknown
+): Promise<ActionResponse<{ readonly hasPin: boolean }>> => {
   try {
     const parsed = loginSchema.safeParse(input);
     if (!parsed.success) {
-      return { ok: false, errorMessage: parsed.error.issues[0]?.message ?? 'Невалидни входни данни.' };
+      return {
+        ok: false,
+        errorMessage: parsed.error.issues[0]?.message ?? 'Невалидни входни данни.',
+      };
     }
 
     const supabase = await createServerSupabaseClient();
@@ -57,12 +62,18 @@ export const signInAction = async (input: unknown): Promise<ActionResponse<{ rea
 export const setupOrVerifyPinAction = async (input: unknown): Promise<ActionResponse> => {
   try {
     const supabase = await createServerSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) {
       return { ok: false, errorMessage: 'Необходим е вход с имейл и парола.' };
     }
 
-    const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single();
     if (!profile) {
       return { ok: false, errorMessage: 'Профилът не е намерен.' };
     }
@@ -70,11 +81,13 @@ export const setupOrVerifyPinAction = async (input: unknown): Promise<ActionResp
     const { pinSecret } = getCryptoSecrets();
     const cookieStore = await cookies();
 
-    // 1. Initial Setup flow (user has no PIN yet)
     if (!profile.pin_hash) {
       const parsedSetup = pinSetupSchema.safeParse(input);
       if (!parsedSetup.success) {
-        return { ok: false, errorMessage: parsedSetup.error.issues[0]?.message ?? 'Невалиден ПИН код.' };
+        return {
+          ok: false,
+          errorMessage: parsedSetup.error.issues[0]?.message ?? 'Невалиден ПИН код.',
+        };
       }
 
       const newPinHash = hashPin(parsedSetup.data.pin);
@@ -103,14 +116,23 @@ export const setupOrVerifyPinAction = async (input: unknown): Promise<ActionResp
       return { ok: true };
     }
 
-    // 2. Normal Unlock flow
-    if (profile.pin_locked_until && new Date(profile.pin_locked_until).getTime() > Date.now()) {
-      return { ok: false, errorMessage: 'ПИН кодът е заключен поради грешни опити. Изчакайте 15 минути.' };
+    if (
+      profile.pin_locked_until &&
+      new Date(profile.pin_locked_until).getTime() > Date.now()
+    ) {
+      return {
+        ok: false,
+        errorMessage: 'ПИН кодът е заключен поради грешни опити. Изчакайте 15 минути.',
+      };
     }
 
     const parsedPin = pinSchema.safeParse(input);
     if (!parsedPin.success) {
-      return { ok: false, errorMessage: parsedPin.error.issues[0]?.message ?? 'ПИН кодът трябва да съдържа точно 4 цифри.' };
+      return {
+        ok: false,
+        errorMessage:
+          parsedPin.error.issues[0]?.message ?? 'ПИН кодът трябва да съдържа точно 4 цифри.',
+      };
     }
 
     const isMatch = verifyPinHash(parsedPin.data.pin, profile.pin_hash);
@@ -135,7 +157,9 @@ export const setupOrVerifyPinAction = async (input: unknown): Promise<ActionResp
 
     const nextFailed = (profile.pin_failed_attempts ?? 0) + 1;
     const isNowLocked = nextFailed >= MAX_FAILED_ATTEMPTS;
-    const lockedUntil = isNowLocked ? new Date(Date.now() + LOCKOUT_DURATION_MINUTES * 60 * 1000).toISOString() : null;
+    const lockedUntil = isNowLocked
+      ? new Date(Date.now() + LOCKOUT_DURATION_MINUTES * 60 * 1000).toISOString()
+      : null;
 
     await supabase
       .from('profiles')
@@ -146,7 +170,10 @@ export const setupOrVerifyPinAction = async (input: unknown): Promise<ActionResp
       .eq('id', user.id);
 
     if (isNowLocked) {
-      return { ok: false, errorMessage: 'Твърде много неуспешни опита. ПИН кодът е заключен за 15 минути.' };
+      return {
+        ok: false,
+        errorMessage: 'Твърде много неуспешни опита. ПИН кодът е заключен за 15 минути.',
+      };
     }
 
     const remaining = MAX_FAILED_ATTEMPTS - nextFailed;
@@ -156,17 +183,27 @@ export const setupOrVerifyPinAction = async (input: unknown): Promise<ActionResp
   }
 };
 
-export const verifyStepUpPinAction = async (input: unknown): Promise<ActionResponse> => {
+export const verifyStepUpPinAction = async (
+  input: unknown
+): Promise<ActionResponse<{ readonly expiresAtMs: number }>> => {
   try {
     const supabase = await createServerSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) return { ok: false, errorMessage: 'Неоторизиран достъп.' };
 
-    const { data: profile } = await supabase.from('profiles').select('pin_hash').eq('id', user.id).single();
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('pin_hash')
+      .eq('id', user.id)
+      .single();
     if (!profile?.pin_hash) return { ok: false, errorMessage: 'Липсва конфигуриран ПИН.' };
 
     const parsed = pinSchema.safeParse(input);
-    if (!parsed.success) return { ok: false, errorMessage: 'ПИН кодът трябва да съдържа точно 4 цифри.' };
+    if (!parsed.success) {
+      return { ok: false, errorMessage: 'ПИН кодът трябва да съдържа точно 4 цифри.' };
+    }
 
     if (!verifyPinHash(parsed.data.pin, profile.pin_hash)) {
       return { ok: false, errorMessage: 'Невалиден ПИН код за отключване на пароли.' };
@@ -174,6 +211,7 @@ export const verifyStepUpPinAction = async (input: unknown): Promise<ActionRespo
 
     const { pinSecret } = getCryptoSecrets();
     const cookieStore = await cookies();
+    const expiresAtMs = Date.now() + STEP_UP_TTL_MINUTES * 60 * 1000;
     const stepUpCookie = createEncryptedPinCookie(user.id, STEP_UP_TTL_MINUTES, pinSecret);
 
     cookieStore.set(STEP_UP_PIN_COOKIE_NAME, stepUpCookie, {
@@ -184,7 +222,7 @@ export const verifyStepUpPinAction = async (input: unknown): Promise<ActionRespo
       maxAge: STEP_UP_TTL_MINUTES * 60,
     });
 
-    return { ok: true };
+    return { ok: true, data: { expiresAtMs } };
   } catch {
     return { ok: false, errorMessage: 'Грешка при потвърждаване на Step-Up ПИН.' };
   }

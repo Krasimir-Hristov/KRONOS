@@ -72,8 +72,8 @@ export const searchCatalogDocumentsClassic = async (
       p_doc_type: validated.docType || undefined,
       p_only_approved: true,
       p_sort_by: validated.sortBy,
-      p_limit: 150,
-      p_offset: 0,
+      p_limit: validated.limit,
+      p_offset: validated.offset,
     });
 
     if (error) {
@@ -98,6 +98,7 @@ export const listReviewQueueDocuments = async (): Promise<
       .from('documents')
       .select(DOCUMENT_SELECT_COLUMNS)
       .eq('owner_id', userId)
+      .eq('metadata->>pendingReview', 'true')
       .order('created_at', { ascending: false })
       .limit(100);
 

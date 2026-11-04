@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   extractDocumentWithVisionOcr,
+  ocrSuggestedFactSchema,
   parseOcrJsonContent,
 } from './documentOcrService';
 
@@ -34,6 +35,38 @@ describe('documentOcrService', () => {
     expect(result.expiresAt).toBeNull();
     expect(result.suggestedFacts).toHaveLength(1);
     expect(result.suggestedFacts[0]?.label).toBe('Kindergeldnummer');
+  });
+
+  it('rejects passwords and PINs from suggestedFacts and redacts them from text', () => {
+    expect(
+      ocrSuggestedFactSchema.safeParse({
+        label: 'Online-PIN',
+        value: '9481',
+        category: 'bank',
+      }).success
+    ).toBe(false);
+
+    const parsed = parseOcrJsonContent(
+      JSON.stringify({
+        title: 'Писмо от банка',
+        topic: 'kontoauszug',
+        docType: 'brief',
+        sender: 'Sparkasse',
+        docDate: '2026-10-12',
+        expiresAt: null,
+        summaryText: 'Съдържа временен Passwort: TopSecret!22.',
+        rawOcrText: 'IBAN DE89370400440532013000 Online-PIN: 9481',
+        suggestedFacts: [
+          { label: 'IBAN', value: 'DE89370400440532013000', category: 'bank' },
+          { label: 'Online-PIN', value: '9481', category: 'bank' },
+        ],
+      })
+    );
+
+    expect(parsed.suggestedFacts).toHaveLength(1);
+    expect(parsed.suggestedFacts[0]?.label).toBe('IBAN');
+    expect(parsed.summaryText).not.toContain('TopSecret!22');
+    expect(parsed.rawOcrText).not.toContain('9481');
   });
 
   it('throws clean Bulgarian error when OPENROUTER_API_KEY is missing', async () => {
@@ -97,6 +130,25 @@ describe('documentOcrService', () => {
       expect(res.topic).toBe('kontoauszug');
       expect(res.sender).toBe('Sparkasse');
       expect(mockFetch).toHaveBeenCalledOnce();
+
+      const [, requestInit] = mockFetch.mock.calls[0] ?? [];
+      const requestPayload = JSON.parse(String(requestInit?.body)) as {
+        readonly messages: readonly {
+          readonly role: string;
+          readonly content: unknown;
+        }[];
+      };
+      const userMessage = requestPayload.messages.find((m) => m.role === 'user');
+      expect(Array.isArray(userMessage?.content)).toBe(true);
+      const parts = userMessage?.content as readonly Record<string, unknown>[];
+      const filePart = parts.find((p) => p.type === 'file');
+      expect(filePart).toMatchObject({
+        type: 'file',
+        file: {
+          filename: 'auszug.pdf',
+          file_data: 'data:application/pdf;base64,JVBERg==',
+        },
+      });
     } finally {
       if (prev === undefined) {
         delete process.env.OPENROUTER_API_KEY;

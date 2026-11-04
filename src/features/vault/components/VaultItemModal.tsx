@@ -1,7 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { X } from 'lucide-react';
+import {
+  getDialogFocusableElements,
+  useDialogFocusTrap,
+} from '@/lib/ui/useDialogFocusTrap';
 import {
   VAULT_CATEGORIES,
   type VaultCategory,
@@ -52,6 +56,9 @@ export const VaultItemModal: React.FC<VaultItemModalProps> = ({
   onSubmitFact,
   onSubmitSecret,
 }) => {
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  useDialogFocusTrap(dialogRef, onClose);
+
   const isEditing = Boolean(editingFact || editingSecret);
   const [category, setCategory] = useState<VaultCategory>(
     editingFact?.category ?? editingSecret?.category ?? 'personal'
@@ -95,11 +102,23 @@ export const VaultItemModal: React.FC<VaultItemModalProps> = ({
 
   return (
     <div
+      ref={dialogRef}
+      tabIndex={-1}
       role="dialog"
       aria-modal="true"
       aria-label={title}
       className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/85 backdrop-blur-md p-4"
     >
+      <span
+        tabIndex={0}
+        data-focus-sentinel="true"
+        aria-hidden="true"
+        className="sr-only"
+        onFocus={() => {
+          const focusables = getDialogFocusableElements(dialogRef.current);
+          focusables[focusables.length - 1]?.focus();
+        }}
+      />
       <article className="w-full max-w-lg rounded-3xl border border-zinc-800 bg-zinc-950 p-6 shadow-2xl">
         <header className="flex items-center justify-between border-b border-zinc-800 pb-4">
           <h2 className="text-base font-bold text-white tracking-wide">{title}</h2>
@@ -113,7 +132,7 @@ export const VaultItemModal: React.FC<VaultItemModalProps> = ({
           </button>
         </header>
 
-        <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+        <form onSubmit={(e) => void handleSubmit(e)} className="mt-5 space-y-4">
           <div>
             <label htmlFor="vault-category" className="block text-xs font-mono text-zinc-400 mb-1.5">
               Категория
@@ -123,7 +142,7 @@ export const VaultItemModal: React.FC<VaultItemModalProps> = ({
               aria-label="Избор на категория"
               value={category}
               onChange={(e) => setCategory(e.target.value as VaultCategory)}
-              className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-3.5 py-2.5 text-sm text-white focus:border-cyan-500 focus:outline-none"
+              className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-3.5 py-2.5 text-base md:text-sm text-white focus:border-cyan-500 focus:outline-none"
             >
               {VAULT_CATEGORIES.map((cat) => (
                 <option key={cat} value={cat}>
@@ -145,7 +164,7 @@ export const VaultItemModal: React.FC<VaultItemModalProps> = ({
               value={label}
               onChange={(e) => setLabel(e.target.value)}
               placeholder={mode === 'fact' ? 'Steuer-ID' : 'BundID Портал'}
-              className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-3.5 py-2.5 text-sm text-white placeholder-zinc-500 focus:border-cyan-500 focus:outline-none"
+              className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-3.5 py-2.5 text-base md:text-sm text-white placeholder-zinc-500 focus:border-cyan-500 focus:outline-none"
             />
           </div>
 
@@ -160,7 +179,7 @@ export const VaultItemModal: React.FC<VaultItemModalProps> = ({
               value={hint}
               onChange={(e) => setHint(e.target.value)}
               placeholder={mode === 'fact' ? 'Напр. основна сметка в Sparkasse' : 'name@example.com'}
-              className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-3.5 py-2.5 text-sm text-white placeholder-zinc-500 focus:border-cyan-500 focus:outline-none"
+              className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-3.5 py-2.5 text-base md:text-sm text-white placeholder-zinc-500 focus:border-cyan-500 focus:outline-none"
             />
           </div>
 
@@ -180,7 +199,7 @@ export const VaultItemModal: React.FC<VaultItemModalProps> = ({
               value={value}
               onChange={(e) => setValue(e.target.value)}
               placeholder={mode === 'fact' ? 'DE89 3704 0044...' : '••••••••••••'}
-              className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-3.5 py-2.5 text-sm text-white placeholder-zinc-500 focus:border-cyan-500 focus:outline-none"
+              className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-3.5 py-2.5 text-base md:text-sm text-white placeholder-zinc-500 focus:border-cyan-500 focus:outline-none"
             />
           </div>
 
@@ -210,6 +229,16 @@ export const VaultItemModal: React.FC<VaultItemModalProps> = ({
           </div>
         </form>
       </article>
+      <span
+        tabIndex={0}
+        data-focus-sentinel="true"
+        aria-hidden="true"
+        className="sr-only"
+        onFocus={() => {
+          const focusables = getDialogFocusableElements(dialogRef.current);
+          focusables[0]?.focus();
+        }}
+      />
     </div>
   );
 };

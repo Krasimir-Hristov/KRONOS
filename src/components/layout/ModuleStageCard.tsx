@@ -26,15 +26,15 @@ export const ModuleStageCard: React.FC<ModuleStageCardProps> = ({ section }) => 
             </span>
             <div className="flex items-center gap-2">
               <span className="rounded-md border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-mono font-bold text-cyan-400">
-                PHASE 3 ACTIVE
+                {t('stageBadge')}
               </span>
-              <span className="text-xs font-mono text-zinc-500">• SUPERVISOR</span>
+              <span className="text-xs font-mono text-zinc-500">• {t('stageRole')}</span>
             </div>
           </div>
 
           <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white flex items-center gap-2.5">
             <span>{t('title')}</span>
-            <Sparkles className="h-5 w-5 text-cyan-400 animate-pulse" />
+            <Sparkles className="h-5 w-5 text-cyan-400 motion-safe:animate-pulse" />
           </h1>
 
           <p className="mt-3 max-w-2xl text-xs sm:text-sm text-zinc-400 leading-relaxed font-medium">

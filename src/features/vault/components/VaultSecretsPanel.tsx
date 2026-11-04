@@ -6,12 +6,16 @@ import { verifyStepUpPinAction } from '@/features/auth';
 import type { VaultSecretMaskedItem } from '../schemas/vaultSchema';
 import { CATEGORY_LABELS_BG } from './VaultItemModal';
 
+const DEFAULT_STEP_UP_TTL_MS = 5 * 60 * 1000;
+
 interface VaultSecretsPanelProps {
   readonly isStepUpUnlocked: boolean;
   readonly items: readonly VaultSecretMaskedItem[];
   readonly isLoading: boolean;
+  readonly loadError: string | null;
+  readonly deleteError?: string | null;
   readonly isDeletingId: string | null;
-  readonly onUnlocked: () => void;
+  readonly onUnlocked: (expiresAtMs: number) => void;
   readonly onReveal: (id: string) => Promise<string>;
   readonly onEdit: (item: VaultSecretMaskedItem) => void;
   readonly onDelete: (item: VaultSecretMaskedItem) => void;
@@ -21,6 +25,8 @@ export const VaultSecretsPanel: React.FC<VaultSecretsPanelProps> = ({
   isStepUpUnlocked,
   items,
   isLoading,
+  loadError,
+  deleteError = null,
   isDeletingId,
   onUnlocked,
   onReveal,
@@ -39,13 +45,14 @@ export const VaultSecretsPanel: React.FC<VaultSecretsPanelProps> = ({
     try {
       const res = await verifyStepUpPinAction({ pin: digits });
       if (!res.ok) {
-        setPinError(res.errorMessage);
         setPinInput('');
+        setPinError(res.errorMessage);
         return;
       }
       setPinInput('');
-      onUnlocked();
+      onUnlocked(res.data?.expiresAtMs ?? Date.now() + DEFAULT_STEP_UP_TTL_MS);
     } catch {
+      setPinInput('');
       setPinError('Грешка при проверка на 4-цифрения ПИН код.');
     } finally {
       setIsVerifyingPin(false);
@@ -86,7 +93,7 @@ export const VaultSecretsPanel: React.FC<VaultSecretsPanelProps> = ({
 
   const handleCopySecret = async (id: string) => {
     try {
-      const plain = revealedMap[id] ?? (await onReveal(id));
+      const plain = await onReveal(id);
       await navigator.clipboard.writeText(plain);
       setCopiedId(id);
       window.setTimeout(() => {
@@ -138,13 +145,34 @@ export const VaultSecretsPanel: React.FC<VaultSecretsPanelProps> = ({
     return <p className="text-sm font-mono text-zinc-500 py-6">Зареждане на криптираните тайни...</p>;
   }
 
+  if (loadError) {
+    return (
+      <p
+        role="alert"
+        className="rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-xs font-medium text-rose-300"
+      >
+        {loadError}
+      </p>
+    );
+  }
+
   if (items.length === 0) {
     return (
-      <article className="rounded-3xl border border-zinc-850 bg-zinc-950/60 p-8 text-center backdrop-blur-xl">
-        <p className="text-sm font-mono text-zinc-500">
-          Секцията с пароли е отключена. Натиснете „Добави парола“, за да запазите първия AES-256-GCM запис.
-        </p>
-      </article>
+      <div className="space-y-3">
+        {deleteError && (
+          <p
+            role="alert"
+            className="rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-xs font-medium text-rose-300"
+          >
+            {deleteError}
+          </p>
+        )}
+        <article className="rounded-3xl border border-zinc-850 bg-zinc-950/60 p-8 text-center backdrop-blur-xl">
+          <p className="text-sm font-mono text-zinc-500">
+            Секцията с пароли е отключена. Натиснете „Добави парола“, за да запазите първия AES-256-GCM запис.
+          </p>
+        </article>
+      </div>
     );
   }
 
@@ -154,6 +182,15 @@ export const VaultSecretsPanel: React.FC<VaultSecretsPanelProps> = ({
         <ShieldCheck className="h-4 w-4 shrink-0" aria-hidden="true" />
         <span>STEP-UP СЕСИЯТА Е АКТИВНА (5 МИН). AES-256-GCM КРИПТИРАНЕ.</span>
       </div>
+
+      {deleteError && (
+        <p
+          role="alert"
+          className="rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-xs font-medium text-rose-300"
+        >
+          {deleteError}
+        </p>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {items.map((item) => {

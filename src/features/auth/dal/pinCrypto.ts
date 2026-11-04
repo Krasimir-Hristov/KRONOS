@@ -46,22 +46,30 @@ export const createEncryptedPinCookie = (
   return encryptAesGcm(JSON.stringify(payload), secretKey);
 };
 
+export const getVerifiedPinCookieExpiry = (
+  cookieValue: string | undefined,
+  expectedUserId: string,
+  secretKey: string
+): number | null => {
+  if (!cookieValue) return null;
+  try {
+    const decrypted = decryptAesGcm(cookieValue, secretKey);
+    if (!decrypted) return null;
+
+    const parsed = JSON.parse(decrypted) as PinCookiePayload;
+    if (parsed.uid !== expectedUserId) return null;
+    if (typeof parsed.exp !== 'number' || Date.now() > parsed.exp) return null;
+
+    return parsed.exp;
+  } catch {
+    return null;
+  }
+};
+
 export const verifyEncryptedPinCookie = (
   cookieValue: string | undefined,
   expectedUserId: string,
   secretKey: string
 ): boolean => {
-  if (!cookieValue) return false;
-  try {
-    const decrypted = decryptAesGcm(cookieValue, secretKey);
-    if (!decrypted) return false;
-
-    const parsed = JSON.parse(decrypted) as PinCookiePayload;
-    if (parsed.uid !== expectedUserId) return false;
-    if (Date.now() > parsed.exp) return false;
-
-    return true;
-  } catch {
-    return false;
-  }
+  return getVerifiedPinCookieExpiry(cookieValue, expectedUserId, secretKey) !== null;
 };

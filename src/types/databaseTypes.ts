@@ -241,6 +241,13 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      save_deduplicated_vault_facts: {
+        Args: { p_candidates?: Json; p_source_document_id: string };
+        Returns: {
+          inserted_count: number;
+          skipped_duplicates: number;
+        }[];
+      };
       search_documents_classic: {
         Args: { p_doc_type?: string; p_limit?: number; p_offset?: number; p_only_approved?: boolean; p_query?: string; p_sort_by?: string; p_topic?: string };
         Returns: {

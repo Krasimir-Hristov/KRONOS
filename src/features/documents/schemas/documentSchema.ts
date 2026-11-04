@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { vaultCategorySchema, type VaultCategory } from '@/features/vault';
+import { isSuspectedSecretFact } from '@/lib/security/secretFactGuard';
 
 export const DOCUMENT_TOPICS = [
   'kinderzuschlag',
@@ -61,16 +62,41 @@ export const DOCUMENT_SORT_MODES = [
 
 export type DocumentSortMode = (typeof DOCUMENT_SORT_MODES)[number];
 
+export const CLASSIC_SEARCH_PAGE_SIZE = 50;
+
 export const documentTopicSchema = z.enum(DOCUMENT_TOPICS);
 export const documentTypeSchema = z.enum(DOCUMENT_TYPES);
 export const documentSortModeSchema = z.enum(DOCUMENT_SORT_MODES);
 
-export const suggestedFactItemSchema = z.object({
-  label: z.string().trim().min(1).max(120),
-  value: z.string().trim().min(1).max(500),
-  category: vaultCategorySchema.catch('other'),
-  hint: z.string().trim().max(240).nullable().optional(),
-});
+export const isValidCalendarIsoDate = (val: string): boolean => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(val)) {
+    return false;
+  }
+  const [yStr, mStr, dStr] = val.split('-');
+  const year = Number(yStr);
+  const month = Number(mStr);
+  const day = Number(dStr);
+  if (month < 1 || month > 12 || day < 1 || day > 31) {
+    return false;
+  }
+  const utc = new Date(Date.UTC(year, month - 1, day));
+  return (
+    utc.getUTCFullYear() === year &&
+    utc.getUTCMonth() === month - 1 &&
+    utc.getUTCDate() === day
+  );
+};
+
+export const suggestedFactItemSchema = z
+  .object({
+    label: z.string().trim().min(1).max(120),
+    value: z.string().trim().min(1).max(500),
+    category: vaultCategorySchema.catch('other'),
+    hint: z.string().trim().max(240).nullable().optional(),
+  })
+  .refine((fact) => !isSuspectedSecretFact(fact.label, fact.hint), {
+    message: 'Пароли и ПИН кодове се съхраняват само криптирани в секция Пароли.',
+  });
 
 export type SuggestedFactItem = {
   readonly label: string;
@@ -81,7 +107,19 @@ export type SuggestedFactItem = {
 
 export const documentReviewMetaSchema = z.object({
   pendingReview: z.boolean().catch(false),
-  suggestedFacts: z.array(suggestedFactItemSchema).catch([]),
+  suggestedFacts: z
+    .unknown()
+    .transform((raw): SuggestedFactItem[] => {
+      if (!Array.isArray(raw)) return [];
+      const valid: SuggestedFactItem[] = [];
+      for (const item of raw) {
+        const res = suggestedFactItemSchema.safeParse(item);
+        if (res.success) {
+          valid.push(res.data);
+        }
+      }
+      return valid;
+    }),
   aiError: z.string().nullable().optional(),
 });
 
@@ -99,13 +137,20 @@ export const classicDocumentSearchSchema = z.object({
   topic: z.string().max(60).optional(),
   docType: z.string().max(60).optional(),
   sortBy: documentSortModeSchema.default('doc_date_desc'),
+  limit: z.number().int().min(1).max(200).default(CLASSIC_SEARCH_PAGE_SIZE),
+  offset: z.number().int().min(0).default(0),
 });
 
 const nullableIsoDateSchema = z
   .string()
   .trim()
   .transform((val) => (val === '' ? null : val))
-  .pipe(z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable());
+  .pipe(
+    z
+      .string()
+      .refine(isValidCalendarIsoDate, 'Невалидна календарна дата (ГГГГ-ММ-ДД).')
+      .nullable()
+  );
 
 export const approveDocumentItemSchema = z.object({
   id: z.string().uuid(),
@@ -133,7 +178,7 @@ export const updateDocumentMetaSchema = z.object({
 });
 
 export type RegisterPendingDocumentInput = z.infer<typeof registerPendingDocumentSchema>;
-export type ClassicDocumentSearchInput = z.infer<typeof classicDocumentSearchSchema>;
+export type ClassicDocumentSearchInput = z.input<typeof classicDocumentSearchSchema>;
 export type ApproveDocumentItemInput = z.infer<typeof approveDocumentItemSchema>;
 export type UpdateDocumentMetaInput = z.infer<typeof updateDocumentMetaSchema>;
 
@@ -166,7 +211,10 @@ const extensionFromMime = (mimeType: string, fallbackName: string): string => {
 };
 
 export const buildPortalFileName = (
-  doc: Pick<CatalogDocumentItem, 'docDate' | 'createdAt' | 'topic' | 'title' | 'mimeType' | 'originalFileName'>
+  doc: Pick<
+    CatalogDocumentItem,
+    'docDate' | 'createdAt' | 'topic' | 'title' | 'mimeType' | 'originalFileName'
+  >
 ): string => {
   const datePart = doc.docDate ?? doc.createdAt.slice(0, 10);
   const cleanTitle = doc.title

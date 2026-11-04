@@ -4,6 +4,8 @@ const A4_WIDTH_PT = 595.28;
 const A4_HEIGHT_PT = 841.89;
 const MAX_IMAGE_DIMENSION_PX = 2200;
 
+export const MAX_ZIP_TOTAL_BYTES = 150 * 1024 * 1024;
+
 export interface BinaryDocumentSource {
   readonly fileName: string;
   readonly mimeType: string;
@@ -156,6 +158,13 @@ export const mergeSelectedDocumentsToPdfBytes = async (
 export const packDocumentsIntoZipBlob = async (
   sources: readonly BinaryDocumentSource[]
 ): Promise<Blob> => {
+  const totalByteLength = sources.reduce((sum, src) => sum + src.bytes.byteLength, 0);
+  if (totalByteLength > MAX_ZIP_TOTAL_BYTES) {
+    throw new Error(
+      'Общият размер на избраните документи надвишава лимита от 150 MB за ZIP архив.'
+    );
+  }
+
   const { zipSync } = await import('fflate');
   const entries: Record<string, Uint8Array> = {};
   const usedNames = new Set<string>();
