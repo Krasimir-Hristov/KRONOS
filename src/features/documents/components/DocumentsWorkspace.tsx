@@ -1,0 +1,205 @@
+'use client';
+
+import React, { useState } from 'react';
+import dynamic from 'next/dynamic';
+import { useBulkUploadQueue } from '../hooks/useBulkUploadQueue';
+import { useDocumentsCatalog } from '../hooks/useDocumentsCatalog';
+import type { CatalogDocumentItem } from '../schemas/documentSchema';
+import { BulkSelectionBar } from './BulkSelectionBar';
+import { BulkUploadDropzone } from './BulkUploadDropzone';
+import { DocumentCatalogList } from './DocumentCatalogList';
+import { DocumentSearchBar } from './DocumentSearchBar';
+import { UploadReviewQueue } from './UploadReviewQueue';
+
+const DynamicDocumentPreviewModal = dynamic(
+  () => import('./DocumentPreviewModal').then((m) => m.DocumentPreviewModal),
+  { ssr: false }
+);
+
+interface DocumentsWorkspaceProps {
+  readonly initialCatalog: readonly CatalogDocumentItem[];
+  readonly initialReviewQueue: readonly CatalogDocumentItem[];
+  readonly initialPreviewDocId?: string | null;
+}
+
+export const DocumentsWorkspace: React.FC<DocumentsWorkspaceProps> = ({
+  initialCatalog,
+  initialReviewQueue,
+  initialPreviewDocId,
+}) => {
+  const uploadQueue = useBulkUploadQueue();
+  const catalog = useDocumentsCatalog(initialCatalog, initialReviewQueue);
+
+  const initialMatch = initialPreviewDocId
+    ? [...initialCatalog, ...initialReviewQueue].find((d) => d.id === initialPreviewDocId) ?? null
+    : null;
+
+  const [previewDoc, setPreviewDoc] = useState<CatalogDocumentItem | null>(initialMatch);
+  const [feedbackBanner, setFeedbackBanner] = useState<string | null>(null);
+  const [errorBanner, setErrorBanner] = useState<string | null>(null);
+
+  const docs = catalog.catalogQuery.data ?? [];
+  const reviewItems = catalog.reviewQueueQuery.data ?? [];
+
+  const handleToggleSelect = (id: string) => {
+    catalog.setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleToggleSelectAll = () => {
+    const allIds = docs.map((d) => d.id);
+    const allChecked = allIds.length > 0 && allIds.every((id) => catalog.selectedIds.includes(id));
+    catalog.setSelectedIds(allChecked ? [] : allIds);
+  };
+
+  const handlePurgeIds = async (ids: readonly string[], labelForConfirm: string) => {
+    if (
+      !window.confirm(
+        `Сигурни ли сте, че искате да изтриете ЗАВИНАГИ ${labelForConfirm} (файл от Supabase Storage + OCR текст + вектори)?`
+      )
+    ) {
+      return;
+    }
+    setErrorBanner(null);
+    try {
+      const res = await catalog.purgeMutation.mutateAsync(ids);
+      setFeedbackBanner(`Физически заличени документи (Hard Purge): ${res.purgedCount}`);
+    } catch (err) {
+      setErrorBanner(err instanceof Error ? err.message : 'Грешка при изтриване.');
+    }
+  };
+
+  return (
+    <section aria-label="Документен RAG Сейф" className="space-y-6">
+      <header className="relative rounded-3xl border border-zinc-800/80 bg-zinc-950/70 p-6 sm:p-8 shadow-2xl backdrop-blur-2xl overflow-hidden">
+        <div className="pointer-events-none absolute -top-24 -left-24 h-48 w-48 rounded-full bg-cyan-500/10 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-24 -right-24 h-48 w-48 rounded-full bg-indigo-500/10 blur-3xl" />
+
+        <div className="relative">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="rounded-md border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-mono font-bold text-cyan-400">
+              VAULT ENGINE
+            </span>
+            <span className="text-xs font-mono text-zinc-500">• 0 € ТЪРСАЧКА</span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+            Документен RAG Сейф
+          </h1>
+          <p className="mt-1.5 text-xs sm:text-sm text-zinc-400 max-w-2xl">
+            Директно масово качване до 50 MB в kronos-vault, OCR на DE/BG/EL, мигновено търсене, ZIP и PDF Merge.
+          </p>
+        </div>
+      </header>
+
+      {feedbackBanner && (
+        <p className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-xs font-medium text-emerald-300">
+          {feedbackBanner}
+        </p>
+      )}
+
+      {errorBanner && (
+        <p role="alert" className="rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-xs font-medium text-rose-300">
+          {errorBanner}
+        </p>
+      )}
+
+      <BulkUploadDropzone
+        tasks={uploadQueue.tasks}
+        isProcessingBatch={uploadQueue.isProcessingBatch}
+        onFilesSelected={uploadQueue.enqueueFiles}
+        onClearFinished={uploadQueue.clearFinishedTasks}
+      />
+
+      <UploadReviewQueue
+        items={reviewItems}
+        isApproving={catalog.approveBatchMutation.isPending}
+        isRetryingOcr={catalog.retryOcrMutation.isPending}
+        onApproveBatch={async (batch) => {
+          setErrorBanner(null);
+          try {
+            const res = await catalog.approveBatchMutation.mutateAsync(batch);
+            setFeedbackBanner(
+              `Одобрени документи: ${res.approvedCount} • Записани факти (дедуплицирани): ${res.savedFactsCount}`
+            );
+          } catch (err) {
+            setErrorBanner(err instanceof Error ? err.message : 'Грешка при одобрение.');
+          }
+        }}
+        onRetryOcr={async (docId) => {
+          setErrorBanner(null);
+          await catalog.retryOcrMutation.mutateAsync(docId);
+        }}
+        onPreview={(doc) => setPreviewDoc(doc)}
+        onDelete={(docId) => handlePurgeIds([docId], 'този документ')}
+      />
+
+      <DocumentSearchBar
+        searchInput={catalog.searchInput}
+        topicFilter={catalog.topicFilter}
+        sortBy={catalog.sortBy}
+        totalCount={docs.length}
+        onSearchChange={catalog.setSearchInput}
+        onTopicChange={catalog.setTopicFilter}
+        onSortChange={catalog.setSortBy}
+      />
+
+      <DocumentCatalogList
+        items={docs}
+        selectedIds={catalog.selectedIds}
+        isLoading={catalog.catalogQuery.isLoading}
+        onToggleSelect={handleToggleSelect}
+        onToggleSelectAll={handleToggleSelectAll}
+        onPreview={(doc) => setPreviewDoc(doc)}
+        onDownloadSingle={(doc) => {
+          void catalog.downloadSingleDocument(doc).catch((err: unknown) => {
+            setErrorBanner(err instanceof Error ? err.message : 'Грешка при сваляне.');
+          });
+        }}
+        onDeleteSingle={(doc) => void handlePurgeIds([doc.id], `„${doc.title}“`)}
+      />
+
+      <BulkSelectionBar
+        selectedCount={catalog.selectedIds.length}
+        isBusy={catalog.isBusyExporting || catalog.purgeMutation.isPending}
+        statusMessage={catalog.bulkStatusMessage}
+        onClearSelection={() => catalog.setSelectedIds([])}
+        onExportZip={() => {
+          void catalog.exportSelectedAsZip().catch((err: unknown) => {
+            setErrorBanner(err instanceof Error ? err.message : 'Грешка при ZIP експорт.');
+          });
+        }}
+        onMergePdfDownloadOnly={() => {
+          void catalog.mergeSelectedToPdf(false).catch((err: unknown) => {
+            setErrorBanner(err instanceof Error ? err.message : 'Грешка при PDF обединяване.');
+          });
+        }}
+        onMergePdfAndSaveToVault={() => {
+          void catalog
+            .mergeSelectedToPdf(true)
+            .then(() => {
+              setFeedbackBanner('Обединеният PDF е свален и запазен като копие в сейфа.');
+            })
+            .catch((err: unknown) => {
+              setErrorBanner(err instanceof Error ? err.message : 'Грешка при PDF обединяване.');
+            });
+        }}
+        onPurgeSelected={() =>
+          void handlePurgeIds(catalog.selectedIds, `${catalog.selectedIds.length} избрани документа`)
+        }
+      />
+
+      {previewDoc && (
+        <DynamicDocumentPreviewModal
+          doc={previewDoc}
+          isSaving={catalog.updateMetaMutation.isPending}
+          onClose={() => setPreviewDoc(null)}
+          onSaveMeta={async (input) => {
+            await catalog.updateMetaMutation.mutateAsync(input);
+            setFeedbackBanner('Метаданните на документа са обновени.');
+          }}
+        />
+      )}
+    </section>
+  );
+};

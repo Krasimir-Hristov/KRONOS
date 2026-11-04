@@ -44,10 +44,15 @@
   },
   "documents": {
     "title": "Документен RAG Сейф",
-    "subtitle": "Качване на PDF и снимки до 50 MB, OCR на DE/BG/EL и интелигентно търсене.",
-    "uploadButton": "Качи документи",
-    "dropzoneText": "Провлачете файлове тук или кликнете за избор (до 50 MB на файл)",
-    "searchPlaceholder": "Търси по заглавие, служба (Kinderzuschlag, Wohngeld), текст...",
+    "subtitle": "Масово качване на PDF и снимки до 50 MB, OCR на DE/BG/EL, мигновено 0 € търсене, ZIP и PDF Merge.",
+    "uploadButton": "Избери файлове",
+    "cameraPdfButton": "Снимай писмо ➔ 1 PDF",
+    "dropzoneText": "Провлачете 10–20+ файла тук или кликнете за избор (до 50 MB на файл)",
+    "approveAllButton": "✅ Одобри всички",
+    "downloadZipButton": "Свали отделни (.ZIP)",
+    "mergePdfButton": "Обедини избраните в 1 PDF",
+    "mergeAndSaveVaultButton": "+ Запази копие в сейфа",
+    "searchPlaceholder": "Мигновено търсене (SQL + Full-Text): Kinderzuschlag, Wohngeld, Sparkasse...",
     "emptyState": "Все още няма качени документи в сейфа."
   },
   "vault": {

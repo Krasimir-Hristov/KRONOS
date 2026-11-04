@@ -2,7 +2,7 @@
 
 import React, { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Clock, Lock, Mail, ShieldAlert } from 'lucide-react';
+import { ArrowRight, Cpu, Lock, Mail, ShieldAlert, Sparkles } from 'lucide-react';
 import { signInAction } from '../dal/authActions';
 
 export const LoginForm: React.FC = () => {
@@ -32,14 +32,28 @@ export const LoginForm: React.FC = () => {
   };
 
   return (
-    <div className="w-full max-w-md mx-auto">
-      <div className="rounded-3xl border border-slate-800 bg-linear-to-b from-slate-900 via-slate-900 to-slate-950 p-8 shadow-2xl backdrop-blur-xl">
-        <div className="flex flex-col items-center text-center mb-8">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-linear-to-br from-amber-400 to-orange-600 text-slate-950 shadow-xl shadow-amber-500/20 mb-4">
-            <Clock className="h-9 w-9" aria-hidden="true" />
+    <div className="w-full max-w-md mx-auto p-4 sm:p-0">
+      <div className="relative rounded-3xl border border-zinc-800/80 bg-zinc-950/80 p-8 shadow-2xl backdrop-blur-2xl overflow-hidden">
+        {/* Subtle background tech glow */}
+        <div className="pointer-events-none absolute -top-24 -left-24 h-48 w-48 rounded-full bg-cyan-500/10 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-24 -right-24 h-48 w-48 rounded-full bg-indigo-500/10 blur-3xl" />
+
+        <div className="flex flex-col items-center text-center mb-8 relative">
+          <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl bg-linear-to-tr from-cyan-500 via-indigo-600 to-violet-600 text-white shadow-xl shadow-cyan-500/20 mb-4">
+            <Cpu className="h-8 w-8" aria-hidden="true" />
+            <Sparkles className="absolute -top-1 -right-1 h-4 w-4 text-cyan-300 animate-pulse" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">Вход в KRONOS</h1>
-          <p className="mt-2 text-sm text-slate-400">
+
+          <div className="flex items-center gap-2 mb-1">
+            <h1 className="text-2xl font-black tracking-wider text-white uppercase">
+              KRONOS
+            </h1>
+            <span className="rounded-md border border-cyan-500/30 bg-cyan-500/10 px-1.5 py-0.5 text-[10px] font-mono font-bold text-cyan-400">
+              SECURE
+            </span>
+          </div>
+
+          <p className="text-xs font-medium text-zinc-400 max-w-xs">
             Личен AI Асистент & Документен RAG Сейф
           </p>
         </div>
@@ -47,23 +61,23 @@ export const LoginForm: React.FC = () => {
         {errorMessage && (
           <div
             role="alert"
-            className="mb-6 flex items-center gap-3 rounded-xl bg-rose-500/10 border border-rose-500/20 p-3.5 text-xs text-rose-300"
+            className="mb-6 flex items-center gap-3 rounded-2xl bg-rose-500/10 border border-rose-500/25 p-3.5 text-xs font-medium text-rose-300 animate-shake"
           >
-            <ShieldAlert className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <ShieldAlert className="h-4 w-4 shrink-0 text-rose-400" aria-hidden="true" />
             <span>{errorMessage}</span>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 relative">
           <div>
             <label
               htmlFor="email-input"
-              className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2"
+              className="block text-[11px] font-mono uppercase tracking-wider text-zinc-400 mb-2"
             >
               Имейл Адрес
             </label>
             <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
+              <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-500">
                 <Mail className="h-4 w-4" aria-hidden="true" />
               </span>
               <input
@@ -75,7 +89,7 @@ export const LoginForm: React.FC = () => {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="name@example.com"
                 aria-label="Имейл адрес за вход"
-                className="w-full rounded-xl bg-slate-950 border border-slate-800 pl-10 pr-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-400/80 focus:ring-1 focus:ring-amber-400/80 transition-colors"
+                className="w-full rounded-xl bg-zinc-900/90 border border-zinc-800 pl-10 pr-4 py-3 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-cyan-500/80 focus:ring-1 focus:ring-cyan-500/80 transition-all font-medium"
               />
             </div>
           </div>
@@ -83,12 +97,12 @@ export const LoginForm: React.FC = () => {
           <div>
             <label
               htmlFor="password-input"
-              className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2"
+              className="block text-[11px] font-mono uppercase tracking-wider text-zinc-400 mb-2"
             >
               Парола
             </label>
             <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
+              <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-500">
                 <Lock className="h-4 w-4" aria-hidden="true" />
               </span>
               <input
@@ -100,7 +114,7 @@ export const LoginForm: React.FC = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 aria-label="Парола за вход"
-                className="w-full rounded-xl bg-slate-950 border border-slate-800 pl-10 pr-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-400/80 focus:ring-1 focus:ring-amber-400/80 transition-colors"
+                className="w-full rounded-xl bg-zinc-900/90 border border-zinc-800 pl-10 pr-4 py-3 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-cyan-500/80 focus:ring-1 focus:ring-cyan-500/80 transition-all font-medium"
               />
             </div>
           </div>
@@ -109,9 +123,10 @@ export const LoginForm: React.FC = () => {
             type="submit"
             disabled={isPending}
             aria-label="Влез в KRONOS"
-            className="w-full mt-2 rounded-xl bg-linear-to-r from-amber-400 to-orange-500 py-3.5 px-4 text-sm font-bold text-slate-950 shadow-lg shadow-amber-500/20 hover:brightness-110 active:scale-[0.99] disabled:opacity-50 transition-all"
+            className="w-full mt-3 inline-flex items-center justify-center gap-2 rounded-xl bg-linear-to-r from-cyan-500 via-indigo-600 to-violet-600 py-3.5 px-4 text-xs font-bold tracking-wider uppercase text-white shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40 hover:brightness-110 active:scale-[0.98] disabled:opacity-50 transition-all"
           >
-            {isPending ? 'Проверка...' : 'Влез в KRONOS'}
+            <span>{isPending ? 'Автентикация...' : 'Влез в Системата'}</span>
+            <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </button>
         </form>
       </div>

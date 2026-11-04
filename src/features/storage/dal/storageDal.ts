@@ -23,11 +23,16 @@ export interface PurgeStorageResult {
   readonly purgedCount: number;
 }
 
+export interface DownloadedVaultObject {
+  readonly bytes: Uint8Array;
+  readonly mimeType: string;
+}
+
 export const createVaultSignedUploadUrl = async (
   input: StorageUploadRequestInput
 ): Promise<SignedUploadResult> => {
   try {
-    const { userId } = await requireAuthAndPin();
+    const { userId } = await requireAuthAndPin({ redirectOnFail: false });
     const validated = storageUploadRequestSchema.parse(input);
 
     const storagePath = buildVaultStoragePath(userId, validated.fileName);
@@ -39,7 +44,9 @@ export const createVaultSignedUploadUrl = async (
       .createSignedUploadUrl(storagePath);
 
     if (error || !data) {
-      throw new Error(`Неуспешно генериране на URL за качване: ${error?.message ?? 'Непозната грешка'}`);
+      throw new Error(
+        `Неуспешно генериране на URL за качване: ${error?.message ?? 'Непозната грешка'}`
+      );
     }
 
     return {
@@ -48,7 +55,8 @@ export const createVaultSignedUploadUrl = async (
       token: data.token,
     };
   } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Грешка при подготовка за качване в сейфа.';
+    const msg =
+      err instanceof Error ? err.message : 'Грешка при подготовка за качване в сейфа.';
     throw new Error(msg, { cause: err });
   }
 };
@@ -58,7 +66,7 @@ export const createVaultSignedDownloadUrl = async (
   expiresInSeconds = 3600
 ): Promise<SignedDownloadResult> => {
   try {
-    const { userId } = await requireAuthAndPin();
+    const { userId } = await requireAuthAndPin({ redirectOnFail: false });
 
     if (!storagePath.startsWith(`${userId}/`)) {
       throw new Error('Нямате права за достъп до този файл.');
@@ -82,11 +90,44 @@ export const createVaultSignedDownloadUrl = async (
   }
 };
 
+export const downloadVaultObjectBytes = async (
+  storagePath: string
+): Promise<DownloadedVaultObject> => {
+  try {
+    const { userId } = await requireAuthAndPin({ redirectOnFail: false });
+
+    if (!storagePath.startsWith(`${userId}/`)) {
+      throw new Error('Нямате права за четене на този файл.');
+    }
+
+    const { storageBucket } = getSupabaseConfig();
+    const supabase = await createServerSupabaseClient();
+
+    const { data, error } = await supabase.storage
+      .from(storageBucket)
+      .download(storagePath);
+
+    if (error || !data) {
+      throw new Error('Неуспешно прочитане на файла от сейфа за OCR обработка.');
+    }
+
+    const arrayBuffer = await data.arrayBuffer();
+    return {
+      bytes: new Uint8Array(arrayBuffer),
+      mimeType: data.type || 'application/octet-stream',
+    };
+  } catch (err) {
+    const msg =
+      err instanceof Error ? err.message : 'Грешка при четене на файл от сториджа.';
+    throw new Error(msg, { cause: err });
+  }
+};
+
 export const purgeVaultStorageObjects = async (
   storagePaths: readonly string[]
 ): Promise<PurgeStorageResult> => {
   try {
-    const { userId } = await requireAuthAndPin();
+    const { userId } = await requireAuthAndPin({ redirectOnFail: false });
 
     const authorizedPaths = storagePaths.filter((p) => p.startsWith(`${userId}/`));
     if (authorizedPaths.length === 0) {

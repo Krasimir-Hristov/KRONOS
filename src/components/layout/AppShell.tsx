@@ -4,13 +4,14 @@ import React, { useTransition } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  Clock,
-  FileText,
-  KeyRound,
+  Cpu,
+  FileCode2,
+  KeySquare,
   Lock,
   LogOut,
-  MessageSquare,
+  MessageSquareCode,
   ShieldCheck,
+  Sparkles,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { lockPinAction, signOutAction } from '@/features/auth';
@@ -26,9 +27,9 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
   const [isPending, startTransition] = useTransition();
 
   const navItems = [
-    { href: '/', label: t('chat'), icon: MessageSquare, exact: true },
-    { href: '/documents', label: t('documents'), icon: FileText, exact: false },
-    { href: '/vault', label: t('vault'), icon: KeyRound, exact: false },
+    { href: '/', label: t('chat'), icon: MessageSquareCode, exact: true },
+    { href: '/documents', label: t('documents'), icon: FileCode2, exact: false },
+    { href: '/vault', label: t('vault'), icon: KeySquare, exact: false },
   ] as const;
 
   const handleLockPin = () => {
@@ -44,22 +45,32 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col lg:flex-row">
-      {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex lg:w-72 lg:flex-col lg:fixed lg:inset-y-0 border-r border-slate-800/80 bg-slate-900/70 backdrop-blur-xl">
-        <div className="p-6 border-b border-slate-800/80">
-          <Link href="/" aria-label="KRONOS Начало" className="flex items-center gap-3 group">
-            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-linear-to-br from-amber-400 to-orange-600 text-slate-950 shadow-lg shadow-amber-500/20 transition-transform duration-200 group-hover:scale-105">
-              <Clock className="h-6 w-6" aria-hidden="true" />
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col lg:flex-row font-sans selection:bg-cyan-500/25 selection:text-cyan-200">
+      {/* Desktop Tech Sidebar */}
+      <aside className="hidden lg:flex lg:w-72 lg:flex-col lg:fixed lg:inset-y-0 border-r border-zinc-800/80 bg-zinc-950/80 backdrop-blur-2xl z-40">
+        <div className="p-6 border-b border-zinc-800/70">
+          <Link href="/" aria-label="KRONOS Начало" className="flex items-center gap-3.5 group">
+            <span className="relative flex h-11 w-11 items-center justify-center rounded-2xl bg-linear-to-tr from-cyan-500 via-indigo-600 to-violet-600 text-white shadow-lg shadow-cyan-500/20 transition-all duration-300 group-hover:scale-105 group-hover:shadow-cyan-500/35">
+              <Sparkles className="h-5 w-5 animate-pulse" aria-hidden="true" />
+              <span className="absolute -inset-0.5 rounded-2xl bg-linear-to-tr from-cyan-500 to-violet-600 opacity-0 blur group-hover:opacity-40 transition-opacity" />
             </span>
             <div>
-              <span className="block text-lg font-bold tracking-tight text-white">KRONOS</span>
-              <span className="block text-xs text-slate-400">{appT('subtitle')}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-lg font-black tracking-widest text-white uppercase bg-linear-to-r from-white via-zinc-100 to-zinc-400 bg-clip-text text-transparent">
+                  KRONOS
+                </span>
+                <span className="inline-flex items-center rounded-md border border-cyan-500/30 bg-cyan-500/10 px-1.5 py-0.5 text-[9px] font-mono font-bold tracking-wider text-cyan-400">
+                  AI v2
+                </span>
+              </div>
+              <span className="block text-[11px] font-medium text-zinc-400">
+                {appT('subtitle')}
+              </span>
             </div>
           </Link>
         </div>
 
-        <nav aria-label={t('mainMenu')} className="flex-1 px-4 py-6 space-y-1.5">
+        <nav aria-label={t('mainMenu')} className="flex-1 px-4 py-6 space-y-2">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href);
@@ -68,23 +79,40 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
                 key={item.href}
                 href={item.href}
                 aria-label={item.label}
-                className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-150 ${
+                className={`group flex items-center justify-between rounded-xl px-4 py-3 text-xs font-semibold tracking-wide transition-all duration-200 ${
                   isActive
-                    ? 'bg-linear-to-r from-amber-500/20 to-orange-500/10 text-amber-300 border border-amber-500/30'
-                    : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
+                    ? 'bg-linear-to-r from-cyan-500/15 via-indigo-500/10 to-transparent text-cyan-300 border border-cyan-500/30 shadow-inner shadow-cyan-500/5'
+                    : 'text-zinc-400 hover:bg-zinc-900/80 hover:text-zinc-100 hover:border-zinc-800 border border-transparent'
                 }`}
               >
-                <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
-                <span>{item.label}</span>
+                <div className="flex items-center gap-3">
+                  <Icon
+                    className={`h-4 w-4 transition-colors ${
+                      isActive ? 'text-cyan-400' : 'text-zinc-500 group-hover:text-zinc-300'
+                    }`}
+                    aria-hidden="true"
+                  />
+                  <span>{item.label}</span>
+                </div>
+                {isActive && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 shadow-sm shadow-cyan-400" />
+                )}
               </Link>
             );
           })}
         </nav>
 
-        <div className="p-4 border-t border-slate-800/80 space-y-3">
-          <div className="flex items-center gap-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 text-xs text-emerald-300">
-            <ShieldCheck className="h-4 w-4 shrink-0" aria-hidden="true" />
-            <span>{appT('pinProtected')}</span>
+        <div className="p-4 border-t border-zinc-800/70 space-y-3">
+          <div className="flex items-center justify-between rounded-xl bg-zinc-900/90 border border-zinc-800/80 px-3.5 py-2.5 text-[11px]">
+            <div className="flex items-center gap-2 text-emerald-400 font-mono">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+              </span>
+              <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>ПИН ЗАЩИТА</span>
+            </div>
+            <span className="font-mono text-[10px] text-zinc-500">AES-256</span>
           </div>
 
           <div className="grid grid-cols-2 gap-2">
@@ -93,9 +121,9 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
               disabled={isPending}
               onClick={handleLockPin}
               aria-label={appT('lockPin')}
-              className="flex items-center justify-center gap-1.5 rounded-xl bg-slate-950/80 border border-slate-800 py-2 px-3 text-xs font-semibold text-slate-300 hover:text-white hover:border-amber-500/40 transition-colors"
+              className="flex items-center justify-center gap-1.5 rounded-xl bg-zinc-900 border border-zinc-800 py-2.5 px-3 text-xs font-semibold text-zinc-300 hover:text-white hover:border-cyan-500/40 hover:bg-zinc-850 active:scale-95 transition-all"
             >
-              <Lock className="h-3.5 w-3.5" aria-hidden="true" />
+              <Lock className="h-3.5 w-3.5 text-cyan-400" aria-hidden="true" />
               <span>{appT('lockPin')}</span>
             </button>
             <button
@@ -103,7 +131,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
               disabled={isPending}
               onClick={handleSignOut}
               aria-label={appT('signOut')}
-              className="flex items-center justify-center gap-1.5 rounded-xl bg-slate-950/80 border border-slate-800 py-2 px-3 text-xs font-semibold text-rose-400 hover:text-rose-300 hover:border-rose-500/40 transition-colors"
+              className="flex items-center justify-center gap-1.5 rounded-xl bg-zinc-900 border border-zinc-800 py-2.5 px-3 text-xs font-semibold text-rose-400 hover:text-rose-300 hover:border-rose-500/40 hover:bg-zinc-850 active:scale-95 transition-all"
             >
               <LogOut className="h-3.5 w-3.5" aria-hidden="true" />
               <span>{appT('signOut')}</span>
@@ -112,22 +140,22 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
         </div>
       </aside>
 
-      {/* Mobile Top Header */}
-      <header className="lg:hidden sticky top-0 z-30 flex items-center justify-between border-b border-slate-800/80 bg-slate-950/85 backdrop-blur-xl px-4 py-3">
+      {/* Mobile Tech Header */}
+      <header className="lg:hidden sticky top-0 z-40 flex items-center justify-between border-b border-zinc-800 bg-zinc-950/85 backdrop-blur-2xl px-4 py-3">
         <Link href="/" aria-label="KRONOS Начало" className="flex items-center gap-2.5">
-          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-linear-to-br from-amber-400 to-orange-600 text-slate-950">
-            <Clock className="h-5 w-5" aria-hidden="true" />
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-linear-to-tr from-cyan-500 via-indigo-600 to-violet-600 text-white shadow-md shadow-cyan-500/20">
+            <Cpu className="h-5 w-5" aria-hidden="true" />
           </span>
-          <span className="font-bold tracking-tight text-white">KRONOS</span>
+          <span className="font-black tracking-widest text-white text-base">KRONOS</span>
         </Link>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
           <button
             type="button"
             disabled={isPending}
             onClick={handleLockPin}
             aria-label={appT('lockPin')}
-            className="p-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white"
+            className="p-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-cyan-400"
           >
             <Lock className="h-4 w-4" aria-hidden="true" />
           </button>
@@ -136,7 +164,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
             disabled={isPending}
             onClick={handleSignOut}
             aria-label={appT('signOut')}
-            className="p-2 rounded-lg bg-slate-900 border border-slate-800 text-rose-400 hover:text-rose-300"
+            className="p-2 rounded-xl bg-zinc-900 border border-zinc-800 text-rose-400 hover:text-rose-300"
           >
             <LogOut className="h-4 w-4" aria-hidden="true" />
           </button>
@@ -145,13 +173,13 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
 
       {/* Main Content Area */}
       <main className="flex-1 lg:pl-72 pb-24 lg:pb-10">
-        <div className="mx-auto max-w-6xl px-4 py-6 sm:px-8 sm:py-10">{children}</div>
+        <div className="mx-auto max-w-6xl px-4 py-6 sm:px-8 sm:py-8">{children}</div>
       </main>
 
-      {/* Mobile 3-Icon Bottom Navigation */}
+      {/* Mobile Cyber Bottom Navigation */}
       <nav
         aria-label={t('mobileMenu')}
-        className="lg:hidden fixed bottom-0 inset-x-0 z-30 grid grid-cols-3 border-t border-slate-800/80 bg-slate-950/90 backdrop-blur-xl px-2 py-2"
+        className="lg:hidden fixed bottom-0 inset-x-0 z-40 grid grid-cols-3 border-t border-zinc-800 bg-zinc-950/90 backdrop-blur-2xl px-2 py-2"
       >
         {navItems.map((item) => {
           const Icon = item.icon;
@@ -161,11 +189,11 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
               key={item.href}
               href={item.href}
               aria-label={item.label}
-              className={`flex flex-col items-center justify-center gap-1 rounded-xl py-2 text-xs font-medium transition-colors ${
-                isActive ? 'text-amber-400' : 'text-slate-400 hover:text-slate-200'
+              className={`flex flex-col items-center justify-center gap-1 rounded-xl py-2 text-[11px] font-semibold transition-colors ${
+                isActive ? 'text-cyan-400 bg-cyan-500/10' : 'text-zinc-500 hover:text-zinc-300'
               }`}
             >
-              <Icon className="h-5 w-5" aria-hidden="true" />
+              <Icon className="h-4 w-4" aria-hidden="true" />
               <span>{item.label}</span>
             </Link>
           );

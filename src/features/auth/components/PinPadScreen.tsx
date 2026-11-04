@@ -132,25 +132,38 @@ export const PinPadScreen: React.FC<PinPadScreenProps> = ({
   const activeInput = !initialHasPin && !isStepUp && isConfirmingSetup ? confirmPin : pin;
 
   return (
-    <div className="w-full max-w-sm mx-auto">
-      <div className="rounded-3xl border border-slate-800 bg-linear-to-b from-slate-900 via-slate-900 to-slate-950 p-6 sm:p-8 shadow-2xl text-center">
-        <div className="flex h-14 w-14 mx-auto items-center justify-center rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 mb-4 shadow-lg">
-          {isStepUp ? <KeyRound className="h-7 w-7" aria-hidden="true" /> : <Lock className="h-7 w-7" aria-hidden="true" />}
+    <div className="w-full max-w-sm mx-auto p-4 sm:p-0">
+      <div className="relative rounded-3xl border border-zinc-800/80 bg-zinc-950/85 p-6 sm:p-8 shadow-2xl text-center backdrop-blur-2xl overflow-hidden">
+        <div className="pointer-events-none absolute -top-20 -right-20 h-40 w-40 rounded-full bg-cyan-500/10 blur-3xl" />
+
+        <div className="flex h-14 w-14 mx-auto items-center justify-center rounded-2xl bg-cyan-500/10 border border-cyan-500/25 text-cyan-400 mb-4 shadow-lg shadow-cyan-500/10">
+          {isStepUp ? <KeyRound className="h-6 w-6" aria-hidden="true" /> : <Lock className="h-6 w-6" aria-hidden="true" />}
         </div>
 
-        <h1 className="text-xl font-bold tracking-tight text-white">
-          {isStepUp ? 'Step-Up ПИН за Пароли' : !initialHasPin ? (isConfirmingSetup ? 'Потвърдете ПИН' : 'Създайте 4-цифрен ПИН') : 'Въведете 4-цифрен ПИН'}
-        </h1>
-        <p className="mt-1.5 text-xs text-slate-400">
+        <h1 className="text-lg font-bold tracking-tight text-white">
           {isStepUp
-            ? 'Потвърдете вашия ПИН за отключване на криптираните пароли.'
+            ? 'Step-Up ПИН за Пароли'
             : !initialHasPin
-              ? (isConfirmingSetup ? 'Въведете същите 4 цифри още веднъж.' : 'Задайте 4 цифри за бърз банков достъп.')
-              : 'Отключва се автоматично при 4-тата цифра.'}
+              ? isConfirmingSetup
+                ? 'Потвърдете ПИН'
+                : 'Създайте 4-цифрен ПИН'
+              : 'Въведете 4-цифрен ПИН'}
+        </h1>
+        <p className="mt-1.5 text-xs text-zinc-400">
+          {isStepUp
+            ? 'Потвърдете вашия ПИН за отключване на криптираните тайни.'
+            : !initialHasPin
+              ? isConfirmingSetup
+                ? 'Въведете същите 4 цифри още веднъж.'
+                : 'Задайте 4 цифри за бърз защитен достъп.'
+              : 'Отключва се мигновено на 4-тата цифра.'}
         </p>
 
         {errorMessage && (
-          <div role="alert" className="mt-4 flex items-center justify-center gap-2 rounded-xl bg-rose-500/10 border border-rose-500/20 p-2.5 text-xs text-rose-300">
+          <div
+            role="alert"
+            className="mt-4 flex items-center justify-center gap-2 rounded-xl bg-rose-500/10 border border-rose-500/25 p-2.5 text-xs font-medium text-rose-300"
+          >
             <ShieldAlert className="h-4 w-4 shrink-0" aria-hidden="true" />
             <span>{errorMessage}</span>
           </div>
@@ -162,17 +175,17 @@ export const PinPadScreen: React.FC<PinPadScreenProps> = ({
             return (
               <span
                 key={index}
-                className={`h-4 w-4 rounded-full transition-all duration-150 ${
+                className={`h-3.5 w-3.5 rounded-full transition-all duration-200 ${
                   isFilled
-                    ? 'scale-110 bg-amber-400 shadow-md shadow-amber-400/50'
-                    : 'bg-slate-800 border border-slate-700'
+                    ? 'scale-125 bg-cyan-400 shadow-md shadow-cyan-400/80 ring-2 ring-cyan-400/30'
+                    : 'bg-zinc-800 border border-zinc-700'
                 }`}
               />
             );
           })}
         </div>
 
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-2.5">
           {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
             <button
               key={digit}
@@ -180,7 +193,7 @@ export const PinPadScreen: React.FC<PinPadScreenProps> = ({
               disabled={isPending}
               aria-label={`Цифра ${digit}`}
               onClick={() => handleDigit(digit)}
-              className="h-14 rounded-2xl bg-slate-950/80 border border-slate-800/80 text-xl font-semibold text-white hover:bg-slate-800/60 active:scale-95 disabled:opacity-50 transition-all"
+              className="h-13 rounded-2xl bg-zinc-900/90 border border-zinc-800 text-lg font-mono font-bold text-white hover:bg-zinc-800 hover:border-cyan-500/40 hover:text-cyan-300 active:scale-95 disabled:opacity-50 transition-all shadow-xs"
             >
               {digit}
             </button>
@@ -190,16 +203,16 @@ export const PinPadScreen: React.FC<PinPadScreenProps> = ({
             disabled={isPending}
             aria-label="Изчисти всичко"
             onClick={handleClear}
-            className="h-14 rounded-2xl bg-slate-950/40 border border-slate-850 text-slate-400 flex items-center justify-center hover:text-white active:scale-95 transition-all"
+            className="h-13 rounded-2xl bg-zinc-900/40 border border-zinc-850 text-zinc-500 flex items-center justify-center hover:text-zinc-200 hover:bg-zinc-850 active:scale-95 transition-all"
           >
-            <RotateCcw className="h-5 w-5" aria-hidden="true" />
+            <RotateCcw className="h-4 w-4" aria-hidden="true" />
           </button>
           <button
             type="button"
             disabled={isPending}
             aria-label="Цифра 0"
             onClick={() => handleDigit('0')}
-            className="h-14 rounded-2xl bg-slate-950/80 border border-slate-800/80 text-xl font-semibold text-white hover:bg-slate-800/60 active:scale-95 disabled:opacity-50 transition-all"
+            className="h-13 rounded-2xl bg-zinc-900/90 border border-zinc-800 text-lg font-mono font-bold text-white hover:bg-zinc-800 hover:border-cyan-500/40 hover:text-cyan-300 active:scale-95 disabled:opacity-50 transition-all shadow-xs"
           >
             0
           </button>
@@ -208,21 +221,21 @@ export const PinPadScreen: React.FC<PinPadScreenProps> = ({
             disabled={isPending}
             aria-label="Изтрий последна цифра"
             onClick={handleDelete}
-            className="h-14 rounded-2xl bg-slate-950/40 border border-slate-850 text-slate-400 flex items-center justify-center hover:text-white active:scale-95 transition-all"
+            className="h-13 rounded-2xl bg-zinc-900/40 border border-zinc-850 text-zinc-500 flex items-center justify-center hover:text-zinc-200 hover:bg-zinc-850 active:scale-95 transition-all"
           >
-            <Delete className="h-5 w-5" aria-hidden="true" />
+            <Delete className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
 
         {!isStepUp && (
-          <div className="mt-6 pt-4 border-t border-slate-850 flex justify-center">
+          <div className="mt-6 pt-4 border-t border-zinc-800/80 flex justify-center">
             <button
               type="button"
               onClick={() => lockPinAction()}
-              aria-label="Заключи или смени потребител"
-              className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
+              aria-label="Вход с друг профил"
+              className="text-xs font-mono text-zinc-500 hover:text-cyan-400 transition-colors"
             >
-              Вход с друг профил
+              ← Вход с друг профил
             </button>
           </div>
         )}
