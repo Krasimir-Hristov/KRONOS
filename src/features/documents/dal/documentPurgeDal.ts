@@ -76,6 +76,17 @@ export const purgeDocumentsHard = async (
       throw storageCommitErr;
     }
 
+    const purgedIds = deletedRows.map((r) => r.id);
+    if (purgedIds.length > 0) {
+      const { error: scrubErr } = await supabase.rpc(
+        'scrub_purged_documents_from_chat',
+        { p_document_ids: purgedIds }
+      );
+      if (scrubErr) {
+        throw new Error('Грешка при почистване на изтритите документи от чат историята.');
+      }
+    }
+
     return { purgedCount: deletedRows.length };
   } catch (err) {
     const msg =

@@ -128,6 +128,7 @@ export const useDocumentsCatalog = (
   const invalidateAll = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: ['documents'] });
     await queryClient.invalidateQueries({ queryKey: VAULT_QUERY_KEYS.facts });
+    await queryClient.invalidateQueries({ queryKey: ['assistant', 'workspace'] });
   }, [queryClient]);
 
   const approveBatchMutation = useMutation({

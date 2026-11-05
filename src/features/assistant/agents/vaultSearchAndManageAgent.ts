@@ -26,8 +26,14 @@ import {
 } from './vaultFactHandlers';
 import { planVaultAction } from './vaultAgentPlanner';
 
-const SECRET_CREATE_REGEX = /добави|запази|нова\s+парола|създай|смени|промени|запиши|speichern/i;
-const SECRET_HINT_REGEX = /парола(?:та)?\s+(?:за|на)\s+([^,.:;\n]{2,60})/i;
+const SECRET_UPDATE_REGEX = /смени|промени|обнови|редактирай|актуализирай|ändern/i;
+const SECRET_CREATE_REGEX = /добави|запази|нова\s+парола|създай|запиши|speichern/i;
+const SECRET_HINT_REGEX =
+  /(?:парола(?:та)?|пин(?:\s+код(?:а)?)?|pin)\s+(?:за|на)\s+([^,.:;=\n]{2,60})/i;
+const EXPLICIT_WRITE_INTENT_REGEX =
+  /запази|запиши|добави|въведи|създай|промени|смени|редактирай|обнови|преименувай|актуализирай|коригирай|задай|изчисти|премахни\s+(?:дата|срок|бележка)|save|add|create|update|edit|rename|change|set|speicher|hinzufüg|änder|aktualisier|umbenenn/i;
+const WRITE_PLAN_ACTIONS = new Set(['update_document', 'create_fact', 'update_fact']);
+
 const GENERIC_ERROR_TEXT =
   'Възникна грешка при обработката на заявката. Опитайте отново след малко.';
 const AI_FALLBACK_NOTE =
@@ -38,13 +44,28 @@ export interface VaultAgentDeps extends DocumentHandlerDeps {
   readonly saveAttachment?: typeof saveAttachmentToVault;
 }
 
+const extractSafeSecretHint = (message: string): string | null => {
+  const raw = message.match(SECRET_HINT_REGEX)?.[1]?.trim();
+  if (!raw) {
+    return null;
+  }
+  const withoutValue = raw.split(/\s+(?:е|са|на\s+стойност|is)\s+/i)[0]?.trim() ?? '';
+  return withoutValue.length >= 2 ? withoutValue.slice(0, 60) : null;
+};
+
 export const handleSecretsRequest = (message: string): HandlerOutput => {
-  const mode = SECRET_CREATE_REGEX.test(message) ? 'create' : 'browse';
-  const searchHint = message.match(SECRET_HINT_REGEX)?.[1]?.trim() ?? null;
+  const mode = SECRET_UPDATE_REGEX.test(message)
+    ? 'edit'
+    : SECRET_CREATE_REGEX.test(message)
+      ? 'create'
+      : 'browse';
+  const searchHint = extractSafeSecretHint(message);
   return {
     replyText:
-      'Паролите и тайните никога не минават през AI и не се пазят в чата. Потвърдете 4-цифрения ПИН (Step-Up) в защитения панел по-долу, за да ги видите, добавите или изтриете.',
-    payload: { actions: [{ kind: 'secrets_gate', mode, searchHint }] },
+      'Паролите и тайните никога не минават през AI и не се пазят в чата. Потвърдете 4-цифрения ПИН (Step-Up) в защитения панел по-долу, за да ги видите, промените, добавите или изтриете.',
+    payload: {
+      actions: [{ kind: 'secrets_gate', mode, purpose: 'step_up', searchHint }],
+    },
   };
 };
 
@@ -65,7 +86,7 @@ const handleAttachmentSave = async (
   }
 
   const warning = saved.aiError
-    ? ` OCR анализът не успя (${saved.aiError}) — можете да попълните данните ръчно в Документния Сейф.`
+    ? ' Автоматичното OCR разчитане не успя — можете да попълните данните ръчно в Документния Сейф.'
     : '';
   return {
     replyText: `Качих „${saved.title}“ в сейфа. Чака вашето одобрение в Документния Сейф (метаданни и факти).${warning}`,
@@ -87,6 +108,16 @@ const dispatchPlan = async (
   attachment: ChatAttachmentInput | null,
   deps: VaultAgentDeps
 ): Promise<HandlerOutput> => {
+  if (
+    WRITE_PLAN_ACTIONS.has(ctx.plan.action) &&
+    !EXPLICIT_WRITE_INTENT_REGEX.test(ctx.message)
+  ) {
+    return {
+      replyText:
+        'За сигурност промяна или запис в сейфа се извършва само при изрична команда (напр. „запази …“, „промени …“ или „преименувай …“). Потвърдете какво точно желаете да запиша или променя.',
+    };
+  }
+
   switch (ctx.plan.action) {
     case 'save_attachment':
       return attachment
@@ -116,66 +147,98 @@ const dispatchPlan = async (
   }
 };
 
+const buildSafeFallbackResult = (replyText: string): AssistantTurnResult => ({
+  replyText,
+  payload: {
+    department: 'vault_search_and_manage',
+    intent: null,
+    tier: 'offline',
+    errorCode: null,
+    facts: [],
+    guide: null,
+    draft: null,
+    actions: [],
+    portalDocumentIds: [],
+  },
+  zone1DocumentIds: [],
+  zone2DocumentIds: [],
+});
+
 export const executeVaultAgent = async (
   rawInput: AgentExecutionInput,
   deps: VaultAgentDeps = {}
 ): Promise<AssistantTurnResult> => {
-  const input = agentExecutionInputSchema.parse(rawInput);
-  let output: HandlerOutput;
-  let aiAvailable = true;
-
   try {
-    if (input.intent === 'manage_secret' || isSecretIntentMessage(input.message)) {
-      output = handleSecretsRequest(input.message);
-    } else {
-      const planned = await planVaultAction(
-        {
-          message: input.message,
-          intent: input.intent,
-          hasAttachment: input.attachment !== null,
-          nowIso: input.nowIso,
-          history: input.history,
-        },
-        deps.invoker
-      );
-      aiAvailable = planned.aiAvailable;
+    const inputParsed = agentExecutionInputSchema.safeParse(rawInput);
+    if (!inputParsed.success) {
+      return buildSafeFallbackResult(GENERIC_ERROR_TEXT);
+    }
+    const input = inputParsed.data;
 
-      const effectivePlan =
-        input.attachment &&
-        (input.attachment.saveToVault || input.intent === 'save_or_update_document')
+    let output: HandlerOutput;
+    let aiAvailable = true;
+
+    try {
+      if (input.intent === 'manage_secret' || isSecretIntentMessage(input.message)) {
+        output = handleSecretsRequest(input.message);
+      } else {
+        const planned = await planVaultAction(
+          {
+            message: input.message,
+            intent: input.intent,
+            hasAttachment: input.attachment !== null,
+            nowIso: input.nowIso,
+            history: input.history,
+          },
+          deps.invoker
+        );
+        aiAvailable = planned.aiAvailable;
+
+        const effectivePlan = input.attachment?.saveToVault
           ? { ...planned.plan, action: 'save_attachment' as const }
           : planned.plan;
 
-      output = await dispatchPlan(
-        {
-          message: input.message,
-          nowIso: input.nowIso,
-          plan: effectivePlan,
-          tier: input.tier,
-        },
-        input.attachment,
-        deps
-      );
+        output = await dispatchPlan(
+          {
+            message: input.message,
+            nowIso: input.nowIso,
+            plan: effectivePlan,
+            tier: input.tier,
+          },
+          input.attachment,
+          deps
+        );
+      }
+    } catch (err) {
+      console.error('[VaultAgent] execution failed:', err);
+      output = { replyText: GENERIC_ERROR_TEXT };
     }
+
+    const payloadParsed = assistantTurnPayloadSchema.safeParse({
+      department: 'vault_search_and_manage',
+      intent: input.intent,
+      tier: input.tier,
+      errorCode: aiAvailable ? null : 'AI_UNAVAILABLE',
+      ...output.payload,
+    });
+    if (!payloadParsed.success) {
+      return buildSafeFallbackResult(GENERIC_ERROR_TEXT);
+    }
+
+    const turnParsed = assistantTurnResultSchema.safeParse({
+      replyText: aiAvailable ? output.replyText : `${output.replyText}${AI_FALLBACK_NOTE}`,
+      payload: payloadParsed.data,
+      zone1DocumentIds: output.zone1Ids ?? [],
+      zone2DocumentIds: output.zone2Ids ?? [],
+    });
+    if (!turnParsed.success) {
+      return buildSafeFallbackResult(GENERIC_ERROR_TEXT);
+    }
+    return turnParsed.data;
   } catch (err) {
-    console.error('[VaultAgent] execution failed:', err);
-    output = { replyText: GENERIC_ERROR_TEXT };
+    console.error('[VaultAgent] unexpected validation error:', err);
+    return buildSafeFallbackResult(GENERIC_ERROR_TEXT);
   }
-
-  const payload = assistantTurnPayloadSchema.parse({
-    department: 'vault_search_and_manage',
-    intent: input.intent,
-    tier: input.tier,
-    errorCode: aiAvailable ? null : 'AI_UNAVAILABLE',
-    ...output.payload,
-  });
-
-  return assistantTurnResultSchema.parse({
-    replyText: aiAvailable ? output.replyText : `${output.replyText}${AI_FALLBACK_NOTE}`,
-    payload,
-    zone1DocumentIds: output.zone1Ids ?? [],
-    zone2DocumentIds: output.zone2Ids ?? [],
-  });
 };
 
 export const vaultSearchAndManageAgent: SubAgentManifest = {

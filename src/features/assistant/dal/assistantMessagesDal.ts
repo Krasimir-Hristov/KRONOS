@@ -6,7 +6,7 @@ import type {
   AssistantWorkspaceSnapshot,
   ChatMessageItem,
 } from '../schemas/assistantViewTypes';
-import { listChatSessions } from './assistantChatDal';
+import { getOwnedChatSessionSummary, listChatSessions } from './assistantChatDal';
 import { loadCatalogDocumentsByIds } from './assistantRagDal';
 
 const MESSAGES_PAGE_LIMIT = 200;
@@ -34,14 +34,15 @@ export const getChatSessionMessages = async (
         'id, sender_role, content, metadata, zone1_document_ids, zone2_document_ids, created_at'
       )
       .eq('session_id', sessionId)
-      .order('created_at', { ascending: true })
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
       .limit(MESSAGES_PAGE_LIMIT);
 
     if (error) {
       throw new Error('Неуспешно зареждане на съобщенията.');
     }
 
-    const rows = data ?? [];
+    const rows = [...(data ?? [])].reverse();
     const parsedPayloads = rows.map((row) =>
       row.sender_role === 'assistant'
         ? assistantTurnPayloadSchema.safeParse(row.metadata)
@@ -90,11 +91,25 @@ export const getChatSessionMessages = async (
 export const loadAssistantWorkspaceSnapshot = async (
   requestedSessionId?: string | null
 ): Promise<AssistantWorkspaceSnapshot> => {
-  const sessions = await listChatSessions();
-  const activeSessionId =
-    requestedSessionId && sessions.some((s) => s.id === requestedSessionId)
-      ? requestedSessionId
-      : (sessions[0]?.id ?? null);
+  const recentSessions = await listChatSessions();
+  let sessions = recentSessions;
+  let activeSessionId: string | null = null;
+
+  if (requestedSessionId) {
+    if (recentSessions.some((s) => s.id === requestedSessionId)) {
+      activeSessionId = requestedSessionId;
+    } else {
+      const ownedOlder = await getOwnedChatSessionSummary(requestedSessionId);
+      if (ownedOlder) {
+        activeSessionId = ownedOlder.id;
+        sessions = [ownedOlder, ...recentSessions];
+      }
+    }
+  }
+
+  if (!activeSessionId) {
+    activeSessionId = sessions[0]?.id ?? null;
+  }
 
   const messages = activeSessionId
     ? await getChatSessionMessages(activeSessionId)

@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { CatalogDocumentItem } from '@/features/documents';
+import { vaultPlanSchema } from './vaultAgentPlanner';
+import { runDocumentSearch, subtractMonthsIso } from './vaultDocumentSearch';
 import { executeVaultAgent } from './vaultSearchAndManageAgent';
 
 const DOC_A: CatalogDocumentItem = {
@@ -61,12 +63,12 @@ describe('vaultSearchAndManageAgent', () => {
     expect(result.payload.errorCode).toBeNull();
   });
 
-  it('keeps working with AI_UNAVAILABLE flag when OpenRouter planner fails', async () => {
+  it('keeps working with AI_UNAVAILABLE flag and heuristic Zone 1 fallback when OpenRouter & Jev fail', async () => {
     const failingInvoker = vi.fn().mockRejectedValue(new Error('OpenRouter offline'));
 
     const result = await executeVaultAgent(
       {
-        message: 'Kinderzuschlag',
+        message: 'Намери последното решение за Kinderzuschlag',
         intent: 'search_documents',
         tier: 'offline',
         attachment: null,
@@ -75,17 +77,23 @@ describe('vaultSearchAndManageAgent', () => {
       },
       {
         invoker: failingInvoker,
-        search: async () => ({ items: [DOC_A], usedVector: false }),
+        search: async () => ({ items: [DOC_B, DOC_A], usedVector: false }),
+        zones: {
+          rerank: async () => {
+            throw new Error('Jev offline');
+          },
+        },
       }
     );
 
     expect(result.payload.errorCode).toBe('AI_UNAVAILABLE');
     expect(result.zone1DocumentIds).toEqual([DOC_A.id]);
+    expect(result.zone2DocumentIds).toEqual([DOC_B.id]);
   });
 
-  it('guards password requests with secrets_gate action without calling AI', async () => {
+  it('guards password requests with create/edit modes and strips secret values from searchHint', async () => {
     const spyInvoker = vi.fn();
-    const result = await executeVaultAgent(
+    const createRes = await executeVaultAgent(
       {
         message: 'Запази нова парола за Elster',
         intent: 'manage_secret',
@@ -98,6 +106,90 @@ describe('vaultSearchAndManageAgent', () => {
     );
 
     expect(spyInvoker).not.toHaveBeenCalled();
-    expect(result.payload.actions[0]?.kind).toBe('secrets_gate');
+    expect(createRes.payload.actions[0]).toMatchObject({
+      kind: 'secrets_gate',
+      mode: 'create',
+      purpose: 'step_up',
+      searchHint: 'Elster',
+    });
+
+    const editRes = await executeVaultAgent(
+      {
+        message: 'Смени паролата за Elster Portal е MyTopSecret99!',
+        intent: 'manage_secret',
+        tier: 'local',
+        attachment: null,
+        history: [],
+        nowIso: '2026-11-05T12:00:00Z',
+      },
+      { invoker: spyInvoker }
+    );
+
+    expect(editRes.payload.actions[0]).toMatchObject({
+      kind: 'secrets_gate',
+      mode: 'edit',
+      purpose: 'step_up',
+      searchHint: 'Elster Portal',
+    });
+  });
+
+  it('blocks prompt-injected vault mutations when user message lacks explicit write intent', async () => {
+    const injectedInvoker = vi.fn().mockResolvedValue(
+      JSON.stringify({
+        action: 'create_fact',
+        fact: { label: 'IBAN', value: 'DE00 0000 0000', category: 'bank' },
+      })
+    );
+
+    const res = await executeVaultAgent(
+      {
+        message: 'Намери ми писмото от вчера',
+        intent: 'search_documents',
+        tier: 'jev',
+        attachment: null,
+        history: [],
+        nowIso: '2026-11-05T12:00:00Z',
+      },
+      { invoker: injectedInvoker }
+    );
+
+    expect(res.replyText).toContain('само при изрична команда');
+  });
+
+  it('clamps end-of-month UTC dates, interleaves search buckets, and preserves undefined vs null in planner', async () => {
+    expect(subtractMonthsIso('2026-03-31T10:00:00Z', 1)).toBe('2026-02-28');
+    expect(subtractMonthsIso('2024-03-31T10:00:00Z', 1)).toBe('2024-02-29');
+
+    const docC: CatalogDocumentItem = {
+      ...DOC_A,
+      id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+    };
+    const merged = await runDocumentSearch(
+      {
+        semanticQuery: 'Kinderzuschlag',
+        searchTerms: ['Sparkasse'],
+        topic: null,
+        monthsBack: null,
+      },
+      'Kinderzuschlag',
+      '2026-11-05T12:00:00Z',
+      async ({ query }) =>
+        query === 'Sparkasse'
+          ? { items: [docC], usedVector: false }
+          : { items: [DOC_A, DOC_B], usedVector: true }
+    );
+    expect(merged.docs.map((d) => d.id)).toEqual([DOC_A.id, docC.id, DOC_B.id]);
+
+    const parsedPlan = vaultPlanSchema.parse({
+      action: 'update_document',
+      monthsBack: '6',
+      update: { title: 'Ново заглавие', expiresAt: null },
+      fact: { label: 'Бележка', value: 'x'.repeat(950) },
+    });
+    expect(parsedPlan.monthsBack).toBe(6);
+    expect(parsedPlan.update.docDate).toBeUndefined();
+    expect(parsedPlan.update.expiresAt).toBeNull();
+    expect(parsedPlan.fact.hint).toBeUndefined();
+    expect(parsedPlan.fact.value).toHaveLength(950);
   });
 });

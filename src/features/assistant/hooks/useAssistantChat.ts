@@ -11,6 +11,7 @@ import {
 } from '@/features/storage';
 import { VAULT_QUERY_KEYS } from '@/features/vault';
 import {
+  cleanupTemporaryAttachmentAction,
   confirmAssistantDeleteAction,
   createAssistantSessionAction,
   deleteAssistantSessionAction,
@@ -67,6 +68,7 @@ export const useAssistantChat = (initialSnapshot?: AssistantWorkspaceSnapshot) =
         ASSISTANT_QUERY_KEYS.workspace(snapshot.activeSessionId),
         snapshot
       );
+      await queryClient.invalidateQueries({ queryKey: ['assistant', 'workspace'] });
       await queryClient.invalidateQueries({ queryKey: ['documents'] });
       await queryClient.invalidateQueries({ queryKey: VAULT_QUERY_KEYS.facts });
     },
@@ -77,59 +79,71 @@ export const useAssistantChat = (initialSnapshot?: AssistantWorkspaceSnapshot) =
     mutationFn: async (payload: SendMessagePayload) => {
       setErrorBanner(null);
       let attachment = null;
+      let uploadedPath: string | null = null;
+      let actionSucceeded = false;
 
-      if (payload.file) {
-        const file = payload.file;
-        if (file.size <= 0 || file.size > MAX_FILE_SIZE_BYTES) {
-          throw new Error('Файлът трябва да е между 1 байт и 50 MB.');
-        }
-        if (!isAllowedMime(file.type)) {
-          throw new Error('Разрешени са само PDF, JPEG, PNG и WebP файлове.');
-        }
-
-        setUploadStatus(`Защитено качване на „${file.name}“...`);
-        try {
-          const signed = await requestDocumentUploadUrlAction({
-            fileName: file.name,
-            fileSizeBytes: file.size,
-            mimeType: file.type,
-          });
-          if (!signed.ok) {
-            throw new Error(signed.errorMessage);
+      try {
+        if (payload.file) {
+          const file = payload.file;
+          if (file.size <= 0 || file.size > MAX_FILE_SIZE_BYTES) {
+            throw new Error('Файлът трябва да е между 1 байт и 50 MB.');
+          }
+          if (!isAllowedMime(file.type)) {
+            throw new Error('Разрешени са само PDF, JPEG, PNG и WebP файлове.');
           }
 
-          await uploadFileToSignedVaultUrl(
-            signed.data.bucket,
-            signed.data.storagePath,
-            signed.data.token,
-            file,
-            file.type
-          );
+          setUploadStatus(`Защитено качване на „${file.name}“...`);
+          try {
+            const signed = await requestDocumentUploadUrlAction({
+              fileName: file.name,
+              fileSizeBytes: file.size,
+              mimeType: file.type,
+            });
+            if (!signed.ok) {
+              throw new Error(signed.errorMessage);
+            }
 
-          attachment = {
-            storagePath: signed.data.storagePath,
-            fileName: file.name,
-            mimeType: file.type,
-            fileSizeBytes: file.size,
-            saveToVault: payload.saveToVault,
-          };
-        } finally {
-          setUploadStatus(null);
+            await uploadFileToSignedVaultUrl(
+              signed.data.bucket,
+              signed.data.storagePath,
+              signed.data.token,
+              file,
+              file.type
+            );
+            uploadedPath = signed.data.storagePath;
+
+            attachment = {
+              storagePath: signed.data.storagePath,
+              fileName: file.name,
+              mimeType: file.type,
+              fileSizeBytes: file.size,
+              saveToVault: payload.saveToVault,
+            };
+          } finally {
+            setUploadStatus(null);
+          }
+        }
+
+        const activeId =
+          workspaceQuery.data?.activeSessionId ?? selectedSessionId;
+        const res = await sendAssistantMessageAction({
+          sessionId: activeId,
+          message: payload.message,
+          attachment,
+        });
+
+        if (!res.ok) {
+          throw new Error(res.errorMessage);
+        }
+        actionSucceeded = true;
+        return res.data;
+      } finally {
+        if (uploadedPath && !actionSucceeded) {
+          await cleanupTemporaryAttachmentAction({ storagePath: uploadedPath }).catch(
+            () => undefined
+          );
         }
       }
-
-      const activeId =
-        workspaceQuery.data?.activeSessionId ?? selectedSessionId;
-      const res = await sendAssistantMessageAction({
-        sessionId: activeId,
-        message: payload.message,
-        attachment,
-      });
-
-      if (!res.ok) {
-        throw new Error(res.errorMessage);
-      }
-      return res.data;
     },
     onSuccess: applySnapshot,
     onError: (err) => {
@@ -184,6 +198,10 @@ export const useAssistantChat = (initialSnapshot?: AssistantWorkspaceSnapshot) =
         sessionId: activeId,
       });
       if (!res.ok) {
+        if (res.partialData) {
+          await applySnapshot(res.partialData.snapshot);
+          await queryClient.invalidateQueries({ queryKey: VAULT_QUERY_KEYS.secrets });
+        }
         throw new Error(res.errorMessage);
       }
       return res.data;
@@ -204,6 +222,7 @@ export const useAssistantChat = (initialSnapshot?: AssistantWorkspaceSnapshot) =
     activeSessionId: workspaceQuery.data?.activeSessionId ?? selectedSessionId,
     messages: workspaceQuery.data?.messages ?? [],
     isLoadingWorkspace: workspaceQuery.isLoading,
+    isWorkspaceLoaded: workspaceQuery.isSuccess,
     uploadStatus,
     errorBanner,
     setErrorBanner,

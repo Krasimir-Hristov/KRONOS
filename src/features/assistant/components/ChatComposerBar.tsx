@@ -25,6 +25,13 @@ export const ChatComposerBar: React.FC<ChatComposerBarProps> = ({
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
   const [saveToVault, setSaveToVault] = useState(false);
 
+  const latestDraftRef = useRef(draftPrompt);
+  latestDraftRef.current = draftPrompt;
+  const latestFileRef = useRef(attachedFile);
+  latestFileRef.current = attachedFile;
+  const latestSaveRef = useRef(saveToVault);
+  latestSaveRef.current = saveToVault;
+
   const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const items = e.clipboardData?.items;
     if (!items) return;
@@ -54,6 +61,10 @@ export const ChatComposerBar: React.FC<ChatComposerBarProps> = ({
       return;
     }
 
+    const prevDraft = draftPrompt;
+    const prevFile = attachedFile;
+    const prevSaveToVault = saveToVault;
+
     const payload: SendMessagePayload = {
       message: trimmed,
       file: attachedFile,
@@ -63,7 +74,20 @@ export const ChatComposerBar: React.FC<ChatComposerBarProps> = ({
     onDraftPromptChange('');
     setAttachedFile(null);
     setSaveToVault(false);
-    await onSend(payload);
+
+    try {
+      await onSend(payload);
+    } catch {
+      if (latestDraftRef.current === '') {
+        onDraftPromptChange(prevDraft);
+      }
+      if (latestFileRef.current === null) {
+        setAttachedFile(prevFile);
+      }
+      if (latestSaveRef.current === false) {
+        setSaveToVault(prevSaveToVault);
+      }
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {

@@ -25,7 +25,10 @@ import {
   selectFactsByLabels,
   toFactCard,
 } from './factCards';
-import { gatherPortalDocuments } from './portalDocumentGatherer';
+import {
+  gatherPortalDocuments,
+  type PortalDocumentBundle,
+} from './portalDocumentGatherer';
 import { buildFallbackVaultPlan } from './vaultAgentPlanner';
 import { runDocumentSearch, type HybridSearchFn } from './vaultDocumentSearch';
 import { sortNewestFirst } from './zoneRanking';
@@ -106,6 +109,12 @@ export const executeGermanBureaucracyAgent = async (
       });
     } catch (err) {
       console.error('[GermanBureaucracyAgent] Failed to save attachment:', err);
+      actions.push({
+        kind: 'notice',
+        tone: 'warning',
+        text: 'Прикаченият файл не можа да бъде записан в Документния Сейф.',
+        documentId: null,
+      });
     }
   }
 
@@ -131,10 +140,29 @@ export const executeGermanBureaucracyAgent = async (
     );
 
     const neededDocs = analysis.guide?.neededDocuments ?? [];
-    const bundle =
-      neededDocs.length > 0
-        ? await gatherPortalDocuments(neededDocs, input.nowIso, deps.search)
-        : { documentIds: [], shortfallNotes: [] };
+    let bundle: PortalDocumentBundle = { documentIds: [], shortfallNotes: [] };
+    if (neededDocs.length > 0) {
+      try {
+        bundle = await gatherPortalDocuments(neededDocs, input.nowIso, deps.search);
+      } catch (searchErr) {
+        console.error(
+          '[GermanBureaucracyAgent] Failed to gather portal documents:',
+          searchErr
+        );
+        bundle = {
+          documentIds: [],
+          shortfallNotes: [
+            'Наличните документи в сейфа не можаха да бъдат проверени автоматично в момента.',
+          ],
+        };
+        actions.push({
+          kind: 'notice',
+          tone: 'warning',
+          text: 'Проверката на документите в сейфа не успя, но анализът е готов.',
+          documentId: null,
+        });
+      }
+    }
 
     const shortfallSuffix =
       bundle.shortfallNotes.length > 0
@@ -181,7 +209,8 @@ export const executeGermanBureaucracyAgent = async (
         fallbackPlan,
         input.message,
         input.nowIso,
-        deps.search
+        deps.search,
+        { useVector: false }
       );
       fallbackDocIds = sortNewestFirst(docs)
         .slice(0, 12)

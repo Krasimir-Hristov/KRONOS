@@ -1,6 +1,7 @@
 import 'server-only';
 import type { CatalogDocumentItem } from '@/features/documents';
 import { updateApprovedDocumentMetadata } from '@/features/documents/server';
+import type { JevRerankStatus } from '../schemas/jevSchema';
 import type { HandlerOutput, VaultHandlerContext } from './agentTypes';
 import { runDocumentSearch, type HybridSearchFn } from './vaultDocumentSearch';
 import { splitIntoZones, type SplitZonesDeps } from './zoneRanking';
@@ -18,13 +19,22 @@ interface ZonedSearch {
   readonly zone1Ids: readonly string[];
   readonly zone2Ids: readonly string[];
   readonly usedJev: boolean;
+  readonly jevStatus: JevRerankStatus;
 }
 
 const searchAndZone = async (
   ctx: VaultHandlerContext,
   deps: DocumentHandlerDeps
 ): Promise<ZonedSearch> => {
-  const { docs } = await runDocumentSearch(ctx.plan, ctx.message, ctx.nowIso, deps.search);
+  const allowTopicRelaxation =
+    ctx.plan.action !== 'update_document' && ctx.plan.action !== 'delete_documents';
+  const { docs } = await runDocumentSearch(
+    ctx.plan,
+    ctx.message,
+    ctx.nowIso,
+    deps.search,
+    { allowTopicRelaxation, useVector: ctx.tier !== 'offline' }
+  );
   const zones = await splitIntoZones(docs, ctx.message, ctx.nowIso, deps.zones);
   return { docs, ...zones };
 };
@@ -38,13 +48,29 @@ export const handleSearchDocuments = async (
     return { replyText: NOT_FOUND_TEXT };
   }
 
+  const jevNote =
+    result.jevStatus === 'timeout'
+      ? ' (Jev не отговори навреме — подредих по резервен алгоритъм.)'
+      : result.jevStatus === 'error'
+        ? ' (Jev класирането е временно недостъпно — подредих по резервен алгоритъм.)'
+        : '';
+
+  if (result.zone1Ids.length === 0) {
+    const similarNote =
+      result.zone2Ids.length > 0
+        ? ` По-долу са намерените ${result.zone2Ids.length} сходни документа по темата — подредени от най-нови към най-стари.`
+        : '';
+    return {
+      replyText: `Няма уверено съвпадение за най-точно попадение.${similarNote}${jevNote}`,
+      zone1Ids: [],
+      zone2Ids: result.zone2Ids,
+    };
+  }
+
   const zone2Note =
     result.zone2Ids.length > 0
       ? ` Отдолу са още ${result.zone2Ids.length} сходни — от най-нови към най-стари.`
       : '';
-  const jevNote = result.usedJev
-    ? ''
-    : ' (Jev не отговори навреме — подредих по резервен алгоритъм.)';
 
   return {
     replyText: `Най-точното попадение е най-горе (Зона 1).${zone2Note}${jevNote}`,
@@ -58,7 +84,13 @@ export const handleUpdateDocument = async (
   deps: DocumentHandlerDeps = {}
 ): Promise<HandlerOutput> => {
   const { update } = ctx.plan;
-  const hasChange = Object.values(update).some((value) => value !== null);
+  const hasChange =
+    update.title !== null ||
+    update.topic !== null ||
+    update.docType !== null ||
+    update.sender !== null ||
+    update.docDate !== undefined ||
+    update.expiresAt !== undefined;
   if (!hasChange) {
     return {
       replyText:
@@ -71,9 +103,10 @@ export const handleUpdateDocument = async (
   if (!target) {
     return { replyText: NOT_FOUND_TEXT };
   }
-  if (result.zone1Ids.length > 1) {
+  if (result.zone1Ids.length > 1 || (!result.usedJev && result.docs.length > 1)) {
     return {
-      replyText: 'Попаднах на два еднакво подходящи документа. Уточнете кой точно да променя.',
+      replyText:
+        'Попаднах на няколко подходящи документа. Уточнете кой точно да променя (напр. по точно заглавие или дата).',
       zone1Ids: result.zone1Ids,
       zone2Ids: result.zone2Ids,
     };
@@ -81,12 +114,12 @@ export const handleUpdateDocument = async (
 
   await updateApprovedDocumentMetadata({
     id: target.id,
-    title: update.title ?? target.title,
-    topic: update.topic ?? target.topic,
-    docType: update.docType ?? target.docType,
-    sender: update.sender ?? target.sender,
-    docDate: update.docDate ?? target.docDate,
-    expiresAt: update.expiresAt ?? target.expiresAt,
+    ...(update.title !== null ? { title: update.title } : {}),
+    ...(update.topic !== null ? { topic: update.topic } : {}),
+    ...(update.docType !== null ? { docType: update.docType } : {}),
+    ...(update.sender !== null ? { sender: update.sender } : {}),
+    ...(update.docDate !== undefined ? { docDate: update.docDate } : {}),
+    ...(update.expiresAt !== undefined ? { expiresAt: update.expiresAt } : {}),
   });
 
   return {

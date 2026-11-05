@@ -66,6 +66,13 @@ describe('germanBureaucracyAgent & supervisorGraph', () => {
       })
     );
 
+    const octOlder: CatalogDocumentItem = {
+      ...KONTO_OCT,
+      id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+      docDate: '2026-10-15',
+      createdAt: '2026-10-16T08:00:00Z',
+    };
+
     const result = await executeGermanBureaucracyAgent(
       {
         message: 'Трябват ми документи и данни за онлайн портала за Wohngeld',
@@ -78,7 +85,7 @@ describe('germanBureaucracyAgent & supervisorGraph', () => {
       {
         invoker: mockInvoker,
         loadFacts: async () => SAMPLE_FACTS,
-        search: async () => ({ items: [KONTO_OCT], usedVector: true }),
+        search: async () => ({ items: [octOlder, KONTO_OCT], usedVector: true }),
       }
     );
 
@@ -87,8 +94,77 @@ describe('germanBureaucracyAgent & supervisorGraph', () => {
       'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
     );
     expect(result.payload.facts[1]?.sourceDocumentId).toBeNull();
+    // Both documents are from 2026-10, so only the newest is picked for that month (1 of 6 months covered)
     expect(result.payload.portalDocumentIds).toEqual([KONTO_OCT.id]);
     expect(result.replyText).toContain('1 от 6');
+  });
+
+  it('preserves analysis and warns when saveAttachment or gatherPortalDocuments fails', async () => {
+    process.env.OPENROUTER_API_KEY = 'test-or-key';
+    const visionFetch = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  replyBg: 'Анализът на формуляра е готов.',
+                  guide: {
+                    explanationBg: 'Обяснение.',
+                    deadline: null,
+                    steps: ['Стъпка 1'],
+                    neededDocuments: [
+                      { description: 'Mietvertrag', topic: 'mietvertrag', monthsBack: null },
+                    ],
+                    neededFactLabels: ['IBAN'],
+                  },
+                  draft: null,
+                }),
+              },
+            },
+          ],
+        }),
+        { status: 200 }
+      )
+    );
+
+    const result = await executeGermanBureaucracyAgent(
+      {
+        message: 'Разчети този формуляр',
+        intent: 'portal_assist',
+        tier: 'jev',
+        attachment: {
+          storagePath: 'owner/2026/11/abc-form.png',
+          fileName: 'form.png',
+          mimeType: 'image/png',
+          fileSizeBytes: 1024,
+          saveToVault: true,
+        },
+        history: [],
+        nowIso: '2026-11-05T12:00:00Z',
+      },
+      {
+        fetchImpl: visionFetch,
+        loadFacts: async () => SAMPLE_FACTS,
+        buildVisionSource: async () => ({
+          fileName: 'form.png',
+          mimeType: 'image/png',
+          bytes: new Uint8Array([1, 2, 3]),
+        }),
+        saveAttachment: async () => {
+          throw new Error('Storage write error');
+        },
+        search: async () => {
+          throw new Error('RPC failure');
+        },
+      }
+    );
+
+    expect(result.payload.errorCode).toBeNull();
+    expect(result.payload.guide?.explanationBg).toBe('Обяснение.');
+    expect(
+      result.payload.actions.filter((a) => a.kind === 'notice' && a.tone === 'warning')
+    ).toHaveLength(2);
   });
 
   it('generates official German Widerspruch draft with Bulgarian explanation', async () => {
@@ -137,29 +213,41 @@ describe('germanBureaucracyAgent & supervisorGraph', () => {
       )
     );
 
-    const customSubagent = {
-      agentId: 'mockGermanAgent',
-      department: 'german_bureaucracy' as const,
-      jevCriteria: 'German portal & letters',
-      inputSchema: (await import('../schemas/assistantSchema')).agentExecutionInputSchema,
-      outputSchema: (await import('../schemas/assistantSchema')).assistantTurnResultSchema,
-      execute: async () => ({
-        replyText: 'Готов отговор от LangGraph.',
-        payload: {
-          department: 'german_bureaucracy' as const,
-          intent: 'draft_reply' as const,
-          tier: 'jev' as const,
-          errorCode: null,
-          facts: [],
-          guide: null,
-          draft: null,
-          actions: [],
-          portalDocumentIds: [],
-        },
-        zone1DocumentIds: [],
-        zone2DocumentIds: [],
-      }),
-    };
+    const { agentExecutionInputSchema, assistantTurnResultSchema } = await import(
+      '../schemas/assistantSchema'
+    );
+    const vaultExecute = vi.fn().mockResolvedValue({
+      replyText: 'Vault agent (unexpected)',
+      payload: {
+        department: 'vault_search_and_manage' as const,
+        intent: 'search_documents' as const,
+        tier: 'jev' as const,
+        errorCode: null,
+        facts: [],
+        guide: null,
+        draft: null,
+        actions: [],
+        portalDocumentIds: [],
+      },
+      zone1DocumentIds: [],
+      zone2DocumentIds: [],
+    });
+    const germanExecute = vi.fn().mockResolvedValue({
+      replyText: 'Готов отговор от LangGraph.',
+      payload: {
+        department: 'german_bureaucracy' as const,
+        intent: 'draft_reply' as const,
+        tier: 'jev' as const,
+        errorCode: null,
+        facts: [],
+        guide: null,
+        draft: null,
+        actions: [],
+        portalDocumentIds: [],
+      },
+      zone1DocumentIds: [],
+      zone2DocumentIds: [],
+    });
 
     const res = await runKronosSupervisorGraph(
       {
@@ -171,12 +259,28 @@ describe('germanBureaucracyAgent & supervisorGraph', () => {
       {
         fetchImpl: fakeJevFetch,
         registry: {
-          vault_search_and_manage: customSubagent,
-          german_bureaucracy: customSubagent,
+          vault_search_and_manage: {
+            agentId: 'mockVaultAgent',
+            department: 'vault_search_and_manage',
+            jevCriteria: 'Vault docs & facts',
+            inputSchema: agentExecutionInputSchema,
+            outputSchema: assistantTurnResultSchema,
+            execute: vaultExecute,
+          },
+          german_bureaucracy: {
+            agentId: 'mockGermanAgent',
+            department: 'german_bureaucracy',
+            jevCriteria: 'German portal & letters',
+            inputSchema: agentExecutionInputSchema,
+            outputSchema: assistantTurnResultSchema,
+            execute: germanExecute,
+          },
         },
       }
     );
 
+    expect(germanExecute).toHaveBeenCalledTimes(1);
+    expect(vaultExecute).not.toHaveBeenCalled();
     expect(res.replyText).toBe('Готов отговор от LangGraph.');
     expect(res.payload.tier).toBe('jev');
   });

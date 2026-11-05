@@ -41,21 +41,28 @@ export const TwoZoneDocumentsPanel: React.FC<TwoZoneDocumentsPanelProps> = ({
   );
   const [exportErr, setExportErr] = useState<string | null>(null);
 
-  const bulkExport = useDocumentBulkExport(allDocs, selectedIds, onVaultSaved);
+  const validIdSet = useMemo(() => new Set(allDocs.map((d) => d.id)), [allDocs]);
+  const activeSelectedIds = useMemo(
+    () => selectedIds.filter((id) => validIdSet.has(id)),
+    [selectedIds, validIdSet]
+  );
+
+  const bulkExport = useDocumentBulkExport(allDocs, activeSelectedIds, onVaultSaved);
 
   if (allDocs.length === 0) {
     return null;
   }
 
   const toggleSelect = (id: string) => {
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
+    setSelectedIds((prev) => {
+      const clean = prev.filter((x) => validIdSet.has(x));
+      return clean.includes(id) ? clean.filter((x) => x !== id) : [...clean, id];
+    });
   };
 
   const toggleAll = () => {
     const allIds = allDocs.map((d) => d.id);
-    const allChecked = allIds.every((id) => selectedIds.includes(id));
+    const allChecked = allIds.every((id) => activeSelectedIds.includes(id));
     setSelectedIds(allChecked ? [] : allIds);
   };
 
@@ -69,7 +76,7 @@ export const TwoZoneDocumentsPanel: React.FC<TwoZoneDocumentsPanelProps> = ({
   };
 
   const renderDocCard = (doc: CatalogDocumentItem, highlightZone1: boolean) => {
-    const isChecked = selectedIds.includes(doc.id);
+    const isChecked = activeSelectedIds.includes(doc.id);
     const uploadedDate = doc.createdAt.slice(0, 10);
     return (
       <article
@@ -164,13 +171,13 @@ export const TwoZoneDocumentsPanel: React.FC<TwoZoneDocumentsPanelProps> = ({
           aria-label="Избери или изчисти всички показани документи"
           className="text-xs font-mono font-semibold text-zinc-300 hover:text-cyan-400"
         >
-          Избрани: {selectedIds.length} / {allDocs.length}
+          Избрани: {activeSelectedIds.length} / {allDocs.length}
         </button>
 
         <div className="flex flex-wrap items-center gap-1.5">
           <button
             type="button"
-            disabled={selectedIds.length === 0 || bulkExport.isBusyExporting}
+            disabled={activeSelectedIds.length === 0 || bulkExport.isBusyExporting}
             onClick={() => void runSafe(() => bulkExport.exportSelectedAsZip())}
             aria-label="Свали избраните документи като отделни файлове в ZIP архив"
             className="inline-flex items-center gap-1.5 rounded-xl bg-cyan-500/15 border border-cyan-500/35 px-3 py-1.5 text-xs font-bold text-cyan-300 hover:bg-cyan-500 hover:text-zinc-950 disabled:opacity-40 transition-all"
@@ -181,7 +188,7 @@ export const TwoZoneDocumentsPanel: React.FC<TwoZoneDocumentsPanelProps> = ({
 
           <button
             type="button"
-            disabled={selectedIds.length < 2 || bulkExport.isBusyExporting}
+            disabled={activeSelectedIds.length < 2 || bulkExport.isBusyExporting}
             onClick={() => void runSafe(() => bulkExport.mergeSelectedToPdf(false))}
             aria-label="Обедини избраните документи в 1 PDF файл"
             className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-zinc-200 hover:border-violet-500/50 hover:text-violet-300 disabled:opacity-40 transition-all"

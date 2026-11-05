@@ -4,7 +4,7 @@ import {
   emptyTurnPayload,
   sendChatMessageInputSchema,
 } from './assistantSchema';
-import { jevDecisionResponseSchema } from './jevSchema';
+import { jevDecisionResponseSchema, routingDecisionSchema } from './jevSchema';
 
 describe('assistantSchema', () => {
   it('rejects empty message when no attachment is provided', () => {
@@ -57,5 +57,16 @@ describe('assistantSchema', () => {
     };
     const parsed = jevDecisionResponseSchema.safeParse(raw);
     expect(parsed.success).toBe(true);
+  });
+
+  it('normalizes mismatched routing department and intent pairs safely', () => {
+    const normalized = routingDecisionSchema.parse({
+      department: 'german_bureaucracy',
+      intent: 'delete_document',
+    });
+    expect(normalized).toEqual({
+      department: 'vault_search_and_manage',
+      intent: 'delete_document',
+    });
   });
 });

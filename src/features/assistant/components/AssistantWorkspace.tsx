@@ -71,7 +71,8 @@ export const AssistantWorkspace: React.FC<AssistantWorkspaceProps> = ({
     bottomAnchorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [chat.messages.length, chat.sendMessageMutation.isPending]);
 
-  const activeError = chat.errorBanner ?? initialLoadError;
+  const activeError =
+    chat.errorBanner ?? (chat.isWorkspaceLoaded ? null : initialLoadError);
 
   const refreshAssistantAndDocs = async () => {
     await queryClient.invalidateQueries({ queryKey: ['documents'] });
@@ -195,7 +196,7 @@ export const AssistantWorkspace: React.FC<AssistantWorkspaceProps> = ({
 
                 {chat.sendMessageMutation.isPending && (
                   <div className="flex items-center gap-2.5 rounded-2xl border border-cyan-500/25 bg-zinc-950/80 px-4 py-3 text-xs font-mono text-cyan-300">
-                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                    <Loader2 className="h-4 w-4 motion-safe:animate-spin" aria-hidden="true" />
                     <span>LangGraph Supervisor & субагентите анализират заявката...</span>
                   </div>
                 )}

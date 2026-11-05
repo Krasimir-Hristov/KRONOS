@@ -3,7 +3,14 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { purgeDocumentsHard } from '@/features/documents/server';
-import { purgeVaultFact, purgeVaultSecret } from '@/features/vault/server';
+import {
+  purgeVaultFactsBatch,
+  purgeVaultSecretsBatch,
+} from '@/features/vault/server';
+import {
+  isSecretIntentMessage,
+  SECRET_CHAT_PLACEHOLDER,
+} from '../agents/keywordClassifier';
 import { runKronosSupervisorGraph } from '../agents/supervisorGraph';
 import {
   confirmDeleteInputSchema,
@@ -33,6 +40,10 @@ const optionalSessionSchema = z
 
 const confirmDeleteWithSessionSchema = confirmDeleteInputSchema.extend({
   sessionId: z.string().uuid().nullable().optional(),
+});
+
+const cleanupAttachmentSchema = z.object({
+  storagePath: z.string().trim().min(5).max(500),
 });
 
 const revalidateAllWorkspaces = (): void => {
@@ -96,6 +107,22 @@ export const deleteAssistantSessionAction = async (
   }
 };
 
+export const cleanupTemporaryAttachmentAction = async (
+  rawInput: unknown
+): Promise<AssistantActionResponse<null>> => {
+  try {
+    const parsed = cleanupAttachmentSchema.safeParse(rawInput);
+    if (!parsed.success) {
+      return { ok: false, errorMessage: 'Невалиден път към временен файл.' };
+    }
+    await cleanupTemporaryAttachment(parsed.data.storagePath);
+    return { ok: true, data: null };
+  } catch (err) {
+    console.error('[AssistantActions] cleanupTemporaryAttachmentAction error:', err);
+    return { ok: false, errorMessage: 'Неуспешно почистване на временния файл.' };
+  }
+};
+
 export const sendAssistantMessageAction = async (
   rawInput: unknown
 ): Promise<AssistantActionResponse<AssistantWorkspaceSnapshot>> => {
@@ -110,23 +137,29 @@ export const sendAssistantMessageAction = async (
     }
 
     const { message, attachment } = parsed.data;
-    const titleSeed = message || attachment?.fileName || 'Нов разговор';
-    const sessionId = await resolveChatSession(parsed.data.sessionId, titleSeed);
-    const history = await getRecentChatHistory(sessionId, 6);
+    const isSecret = isSecretIntentMessage(message);
+    const persistedMessage = isSecret ? SECRET_CHAT_PLACEHOLDER : message;
+    const titleSeed = isSecret
+      ? 'Сигурен панел за пароли'
+      : message || attachment?.fileName || 'Нов разговор';
 
-    const userVisibleText = attachment
-      ? message
-        ? `${message}\n\n📎 Прикачен файл: ${attachment.fileName}`
-        : `📎 Прикачен файл: ${attachment.fileName}`
-      : message;
-
-    await appendChatMessage({
-      sessionId,
-      role: 'user',
-      content: userVisibleText,
-    });
-
+    let sessionId: string;
     try {
+      sessionId = await resolveChatSession(parsed.data.sessionId, titleSeed);
+      const history = await getRecentChatHistory(sessionId, 6);
+
+      const userVisibleText = attachment
+        ? persistedMessage
+          ? `${persistedMessage}\n\n📎 Прикачен файл: ${attachment.fileName}`
+          : `📎 Прикачен файл: ${attachment.fileName}`
+        : persistedMessage;
+
+      await appendChatMessage({
+        sessionId,
+        role: 'user',
+        content: userVisibleText,
+      });
+
       const turn = await runKronosSupervisorGraph({
         message,
         attachment: attachment ?? null,
@@ -167,6 +200,8 @@ export const confirmAssistantDeleteAction = async (
     readonly snapshot: AssistantWorkspaceSnapshot;
   }>
 > => {
+  let deletedCount = 0;
+  let targetSessionId: string | null = null;
   try {
     const parsed = confirmDeleteWithSessionSchema.safeParse(rawInput);
     if (!parsed.success) {
@@ -174,21 +209,15 @@ export const confirmAssistantDeleteAction = async (
     }
 
     const { target, ids, sessionId } = parsed.data;
-    let deletedCount = 0;
+    targetSessionId = sessionId ?? null;
 
     if (target === 'documents') {
       const res = await purgeDocumentsHard(ids);
       deletedCount = res.purgedCount;
     } else if (target === 'facts') {
-      for (const id of ids) {
-        await purgeVaultFact(id);
-        deletedCount += 1;
-      }
+      deletedCount = await purgeVaultFactsBatch(ids);
     } else {
-      for (const id of ids) {
-        await purgeVaultSecret(id);
-        deletedCount += 1;
-      }
+      deletedCount = await purgeVaultSecretsBatch(ids);
     }
 
     if (sessionId) {
@@ -212,7 +241,7 @@ export const confirmAssistantDeleteAction = async (
     }
 
     revalidateAllWorkspaces();
-    const snapshot = await loadAssistantWorkspaceSnapshot(sessionId ?? null);
+    const snapshot = await loadAssistantWorkspaceSnapshot(targetSessionId);
     return { ok: true, data: { deletedCount, snapshot } };
   } catch (err) {
     if (err instanceof Error && err.message === 'STEP_UP_PIN_REQUIRED') {
@@ -222,6 +251,18 @@ export const confirmAssistantDeleteAction = async (
       };
     }
     console.error('[AssistantActions] confirmAssistantDeleteAction error:', err);
+    if (deletedCount > 0) {
+      revalidateAllWorkspaces();
+      const snapshot = await loadAssistantWorkspaceSnapshot(targetSessionId).catch(
+        () => undefined
+      );
+      return {
+        ok: false,
+        errorMessage:
+          'Записите бяха изтрити завинаги, но възникна грешка при обновяване на чат историята.',
+        partialData: snapshot ? { deletedCount, snapshot } : undefined,
+      };
+    }
     return {
       ok: false,
       errorMessage: 'Неуспешно физическо изтриване (Hard Purge).',

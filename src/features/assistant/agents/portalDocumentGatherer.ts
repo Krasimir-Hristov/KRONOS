@@ -41,18 +41,37 @@ export const gatherPortalDocuments = async (
       search
     );
 
-    const wanted = Math.min(need.monthsBack ?? DEFAULT_DOCS_PER_NEED, MAX_DOCS_PER_NEED);
-    const picked = sortNewestFirst(docs).slice(0, wanted);
-    for (const doc of picked) {
-      collected.set(doc.id, doc);
+    const sorted = sortNewestFirst(docs);
+    let picked: readonly CatalogDocumentItem[];
+
+    if (need.monthsBack) {
+      const wantedMonths = Math.min(need.monthsBack, MAX_DOCS_PER_NEED);
+      const byMonth = new Map<string, CatalogDocumentItem>();
+      for (const doc of sorted) {
+        const monthKey = (doc.docDate ?? doc.createdAt.slice(0, 10)).slice(0, 7);
+        if (!byMonth.has(monthKey)) {
+          byMonth.set(monthKey, doc);
+          if (byMonth.size >= wantedMonths) {
+            break;
+          }
+        }
+      }
+      picked = [...byMonth.values()];
+      if (picked.length < wantedMonths) {
+        shortfallNotes.push(
+          `„${need.description}“: намерих ${picked.length} от ${wantedMonths} исканите месеца.`
+        );
+      }
+    } else {
+      const wanted = Math.min(DEFAULT_DOCS_PER_NEED, MAX_DOCS_PER_NEED);
+      picked = sorted.slice(0, wanted);
+      if (picked.length === 0) {
+        shortfallNotes.push(`„${need.description}“: не намерих такъв документ в сейфа.`);
+      }
     }
 
-    if (need.monthsBack && picked.length < need.monthsBack) {
-      shortfallNotes.push(
-        `„${need.description}“: намерих ${picked.length} от ${need.monthsBack} исканите.`
-      );
-    } else if (picked.length === 0) {
-      shortfallNotes.push(`„${need.description}“: не намерих такъв документ в сейфа.`);
+    for (const doc of picked) {
+      collected.set(doc.id, doc);
     }
   }
 

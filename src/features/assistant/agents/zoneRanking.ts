@@ -1,16 +1,25 @@
 import 'server-only';
 import type { CatalogDocumentItem } from '@/features/documents';
 import { rerankZone1WithJev } from './jevClient';
-import type { ZoneCandidate, ZoneSplit } from '../schemas/jevSchema';
+import type {
+  JevRerankStatus,
+  ZoneCandidate,
+  ZoneSplit,
+} from '../schemas/jevSchema';
 
 const MAX_ZONE1 = 2;
 const MAX_ZONE2 = 40;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+const LATEST_SINGULAR_REGEX = /последн(?:ия|ият|ото|ата)|най-нов(?:ия|ият|ото|ата)/i;
+
 const TIME_HINTS: readonly { readonly regex: RegExp; readonly days: number }[] = [
   { regex: /вчера|gestern/i, days: 2 },
   { regex: /днес|today|heute/i, days: 1 },
-  { regex: /тази седмица|последните дни|скоро|наскоро|току-що|ново|последн|neulich|kürzlich/i, days: 8 },
+  {
+    regex: /тази седмица|последните дни|скоро|наскоро|току-що|ново|neulich|kürzlich/i,
+    days: 8,
+  },
   { regex: /този месец|миналия месец|diesen monat/i, days: 35 },
 ];
 
@@ -49,6 +58,11 @@ export const pickZone1Heuristically = (
   if (docs.length === 0) {
     return [];
   }
+  if (LATEST_SINGULAR_REGEX.test(message)) {
+    const newest = sortNewestFirst(docs)[0];
+    return newest ? [newest.id] : [];
+  }
+
   const hint = TIME_HINTS.find((entry) => entry.regex.test(message));
 
   const scored = docs.map((doc, index) => {
@@ -76,7 +90,19 @@ export const pickZone1Heuristically = (
 
 export interface SplitZonesDeps {
   readonly rerank?: typeof rerankZone1WithJev;
+  readonly skipJev?: boolean;
 }
+
+const isTimeoutError = (err: unknown): boolean => {
+  if (!(err instanceof Error)) {
+    return false;
+  }
+  return (
+    err.name === 'TimeoutError' ||
+    err.name === 'AbortError' ||
+    /timeout|timed out|aborted/i.test(err.message)
+  );
+};
 
 export const splitIntoZones = async (
   docsInRelevanceOrder: readonly CatalogDocumentItem[],
@@ -85,14 +111,17 @@ export const splitIntoZones = async (
   deps: SplitZonesDeps = {}
 ): Promise<ZoneSplit> => {
   if (docsInRelevanceOrder.length === 0) {
-    return { zone1Ids: [], zone2Ids: [], usedJev: false };
+    return { zone1Ids: [], zone2Ids: [], usedJev: false, jevStatus: 'skipped' };
   }
 
   let zone1Ids: readonly string[];
   let usedJev = false;
+  let jevStatus: JevRerankStatus = 'skipped';
 
   if (docsInRelevanceOrder.length === 1) {
     zone1Ids = [docsInRelevanceOrder[0]!.id];
+  } else if (deps.skipJev) {
+    zone1Ids = pickZone1Heuristically(docsInRelevanceOrder, message, nowIso);
   } else {
     try {
       const rerank = deps.rerank ?? rerankZone1WithJev;
@@ -100,8 +129,10 @@ export const splitIntoZones = async (
         await rerank(docsInRelevanceOrder.map(toZoneCandidate), message, nowIso)
       ).slice(0, MAX_ZONE1);
       usedJev = true;
-    } catch {
+      jevStatus = 'ok';
+    } catch (err) {
       zone1Ids = pickZone1Heuristically(docsInRelevanceOrder, message, nowIso);
+      jevStatus = isTimeoutError(err) ? 'timeout' : 'error';
     }
   }
 
@@ -112,5 +143,5 @@ export const splitIntoZones = async (
     .slice(0, MAX_ZONE2)
     .map((doc) => doc.id);
 
-  return { zone1Ids, zone2Ids, usedJev };
+  return { zone1Ids, zone2Ids, usedJev, jevStatus };
 };

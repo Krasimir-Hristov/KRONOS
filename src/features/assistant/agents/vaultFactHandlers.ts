@@ -45,10 +45,14 @@ export const handleCreateFact = async (ctx: VaultHandlerContext): Promise<Handle
         'За да запазя факт, ми кажете и името, и стойността — напр. „запази IBAN: DE12 3456 …“.',
     };
   }
-  if (isSuspectedSecretFact(label, hint)) {
+  if (isSuspectedSecretFact(label, hint ?? null)) {
     return {
       replyText: SECRET_REDIRECT_TEXT,
-      payload: { actions: [{ kind: 'secrets_gate', mode: 'create', searchHint: label }] },
+      payload: {
+        actions: [
+          { kind: 'secrets_gate', mode: 'create', purpose: 'step_up', searchHint: label },
+        ],
+      },
     };
   }
 
@@ -56,7 +60,7 @@ export const handleCreateFact = async (ctx: VaultHandlerContext): Promise<Handle
     category: category ?? 'personal',
     label,
     value,
-    usernameOrHint: hint,
+    usernameOrHint: hint ?? null,
     sourceDocumentId: null,
   });
   if (!parsed.success) {
@@ -88,7 +92,7 @@ export const handleCreateFact = async (ctx: VaultHandlerContext): Promise<Handle
 
 export const handleUpdateFact = async (ctx: VaultHandlerContext): Promise<HandlerOutput> => {
   const { label, value, category, hint } = ctx.plan.fact;
-  if (!label && !value && !hint && !category) {
+  if (label === null && value === null && category === null && hint === undefined) {
     return { replyText: 'Какво точно да променя? Кажете ми новата стойност или ново име на факта.' };
   }
 
@@ -100,7 +104,7 @@ export const handleUpdateFact = async (ctx: VaultHandlerContext): Promise<Handle
     return { replyText: `Не намерих факт „${query}“, който да променя.` };
   }
   const target = matches[0];
-  if (!target || (matches.length > 1 && !label)) {
+  if (!target || matches.length > 1) {
     return {
       replyText: 'Намерих няколко подобни записа. Уточнете кой точно да променя.',
       payload: { facts: matches.slice(0, MAX_FACT_CARDS).map(toFactCard) },
@@ -108,10 +112,15 @@ export const handleUpdateFact = async (ctx: VaultHandlerContext): Promise<Handle
   }
 
   const nextLabel = label ?? target.label;
-  if (isSuspectedSecretFact(nextLabel, hint)) {
+  const nextHint = hint !== undefined ? hint : target.usernameOrHint;
+  if (isSuspectedSecretFact(nextLabel, nextHint)) {
     return {
       replyText: SECRET_REDIRECT_TEXT,
-      payload: { actions: [{ kind: 'secrets_gate', mode: 'create', searchHint: nextLabel }] },
+      payload: {
+        actions: [
+          { kind: 'secrets_gate', mode: 'edit', purpose: 'step_up', searchHint: nextLabel },
+        ],
+      },
     };
   }
 
@@ -120,10 +129,25 @@ export const handleUpdateFact = async (ctx: VaultHandlerContext): Promise<Handle
     category: category ?? target.category,
     label: nextLabel,
     value: value ?? target.valuePlain,
-    usernameOrHint: hint ?? target.usernameOrHint,
+    usernameOrHint: nextHint,
   });
   if (!parsed.success) {
     return { replyText: 'Промяната не е валидна. Проверете етикета и стойността.' };
+  }
+
+  const duplicate = facts.find(
+    (fact) =>
+      fact.id !== target.id &&
+      areFactsDuplicate(
+        { label: fact.label, value: fact.valuePlain },
+        { label: parsed.data.label, value: parsed.data.value }
+      )
+  );
+  if (duplicate) {
+    return {
+      replyText: `Промяната дублира вече съществуващ запис „${duplicate.label}“.`,
+      payload: { facts: [toFactCard(duplicate)] },
+    };
   }
 
   await updateVaultFact(parsed.data);

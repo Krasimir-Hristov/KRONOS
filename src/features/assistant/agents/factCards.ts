@@ -27,9 +27,12 @@ export const findFactsByQuery = (
   facts: readonly VaultFactItem[],
   query: string
 ): readonly VaultFactItem[] => {
+  if (!query.trim()) {
+    return facts;
+  }
   const tokens = tokenize(query);
   if (tokens.length === 0) {
-    return facts;
+    return [];
   }
 
   return facts

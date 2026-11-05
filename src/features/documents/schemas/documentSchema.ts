@@ -182,6 +182,29 @@ export type ClassicDocumentSearchInput = z.input<typeof classicDocumentSearchSch
 export type ApproveDocumentItemInput = z.infer<typeof approveDocumentItemSchema>;
 export type UpdateDocumentMetaInput = z.infer<typeof updateDocumentMetaSchema>;
 
+export const patchDocumentMetaSchema = z
+  .object({
+    id: z.string().uuid(),
+    title: z.string().trim().min(1, 'Заглавието е задължително.').max(200).optional(),
+    topic: documentTopicSchema.optional(),
+    docType: documentTypeSchema.optional(),
+    sender: z.string().trim().max(160).optional(),
+    docDate: nullableIsoDateSchema.optional(),
+    expiresAt: nullableIsoDateSchema.optional(),
+  })
+  .refine(
+    (val) =>
+      val.title !== undefined ||
+      val.topic !== undefined ||
+      val.docType !== undefined ||
+      val.sender !== undefined ||
+      val.docDate !== undefined ||
+      val.expiresAt !== undefined,
+    { message: 'Изберете поне едно поле за обновяване на документа.' }
+  );
+
+export type PatchDocumentMetaInput = z.infer<typeof patchDocumentMetaSchema>;
+
 export interface CatalogDocumentItem {
   readonly id: string;
   readonly title: string;

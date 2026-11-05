@@ -121,13 +121,28 @@ export const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
           }
 
           if (action.kind === 'notice') {
+            const isWarn = action.tone === 'warning';
             return (
               <div
                 key={`notice-${idx}`}
-                className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-2 text-xs text-emerald-200"
+                className={`mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3.5 py-2 text-xs ${
+                  isWarn
+                    ? 'border-amber-500/35 bg-amber-500/10 text-amber-200'
+                    : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200'
+                }`}
               >
                 <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" aria-hidden="true" />
+                  {isWarn ? (
+                    <AlertTriangle
+                      className="h-4 w-4 shrink-0 text-amber-400"
+                      aria-hidden="true"
+                    />
+                  ) : (
+                    <CheckCircle2
+                      className="h-4 w-4 shrink-0 text-emerald-400"
+                      aria-hidden="true"
+                    />
+                  )}
                   <span>{action.text}</span>
                 </div>
                 {action.documentId && (

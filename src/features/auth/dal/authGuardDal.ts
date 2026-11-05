@@ -84,7 +84,7 @@ export const requireAuthAndPin = async (
   const pinCookie = cookieStore.get(PIN_COOKIE_NAME)?.value;
   const { pinSecret } = getCryptoSecrets();
 
-  const isPinValid = verifyEncryptedPinCookie(pinCookie, user.id, pinSecret);
+  const isPinValid = verifyEncryptedPinCookie(pinCookie, user.id, pinSecret, 'session');
   if (!isPinValid) {
     if (options.redirectOnFail) {
       redirect('/pin');
@@ -108,7 +108,8 @@ export const requireStepUpPin = async (): Promise<VerifiedAuthContext> => {
   const isStepUpValid = verifyEncryptedPinCookie(
     stepUpCookie,
     context.userId,
-    pinSecret
+    pinSecret,
+    'step_up'
   );
 
   if (!isStepUpValid) {

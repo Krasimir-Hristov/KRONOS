@@ -4,9 +4,11 @@ import {
   processQueuedDocumentOcrAndRag,
   registerPendingDocument,
 } from '@/features/documents/server';
+import { sanitizeFileNameSlug } from '@/features/storage';
 import {
   createVaultSignedDownloadUrl,
   downloadVaultObjectBytes,
+  getVaultObjectMetadata,
   purgeVaultStorageObjects,
 } from '@/features/storage/server';
 import type { OcrDocumentInput } from '@/lib/ai/documentOcrService';
@@ -85,6 +87,21 @@ export const buildVisionSourceFromAttachment = async (
 ): Promise<OcrDocumentInput> => {
   try {
     await assertOwnedPath(attachment.storagePath);
+    const expectedSuffix = `-${sanitizeFileNameSlug(attachment.fileName)}`;
+    if (!attachment.storagePath.endsWith(expectedSuffix)) {
+      throw new Error('Името на прикачения файл не съответства на пътя в хранилището.');
+    }
+
+    const storedObject = await getVaultObjectMetadata(attachment.storagePath);
+    if (
+      storedObject.sizeBytes !== attachment.fileSizeBytes ||
+      storedObject.mimeType !== attachment.mimeType
+    ) {
+      throw new Error(
+        'Метаданните на прикачения файл не съответстват на обекта в хранилището.'
+      );
+    }
+
     if (attachment.fileSizeBytes <= INLINE_VISION_MAX_BYTES) {
       const { bytes } = await downloadVaultObjectBytes(attachment.storagePath);
       return { fileName: attachment.fileName, mimeType: attachment.mimeType, bytes };

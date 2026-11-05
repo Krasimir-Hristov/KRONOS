@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { CatalogDocumentItem } from '@/features/documents';
 import { selectZone1FromProbabilities } from './jevClient';
+import { classifyByKeywords } from './keywordClassifier';
 import { routeWithJev } from './jevRouter';
 import { splitIntoZones } from './zoneRanking';
 
@@ -162,5 +163,21 @@ describe('jevRouter & two-zone reranking', () => {
     const map = new Map([['doc_1', '11111111-1111-4111-8111-111111111111']]);
     const picked = selectZone1FromProbabilities({ none: 0.85, doc_1: 0.15 }, map);
     expect(picked).toEqual([]);
+  });
+
+  it('prioritizes delete requests over portal keywords and unsaved attachments', () => {
+    expect(
+      classifyByKeywords({
+        message: 'Изтрий молбата за Wohngeld от онлайн портала',
+        attachment: null,
+      })
+    ).toEqual({ department: 'vault_search_and_manage', intent: 'delete_document' });
+
+    expect(
+      classifyByKeywords({
+        message: 'Изтрий IBAN записа ми',
+        attachment: null,
+      })
+    ).toEqual({ department: 'vault_search_and_manage', intent: 'manage_fact' });
   });
 });

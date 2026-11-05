@@ -1,6 +1,7 @@
 import 'server-only';
 import { z } from 'zod';
 import { getAiModelsConfig } from '@/config/aiModelsConfig';
+import { isValidCalendarIsoDate } from '@/features/documents';
 import { callJsonModel, type LlmTextInvoker } from '@/lib/ai/llmJsonService';
 import {
   DOCUMENT_TOPICS,
@@ -23,10 +24,28 @@ export const VAULT_ACTIONS = [
 
 export type VaultAction = (typeof VAULT_ACTIONS)[number];
 
-const isoDateOrNull = z
-  .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/)
-  .nullable()
+const optionalNullableIsoDate = z
+  .union([
+    z.string().trim().refine(isValidCalendarIsoDate),
+    z.null(),
+    z.undefined(),
+  ])
+  .catch(undefined);
+
+const optionalNullableHint = z
+  .union([z.string().trim().min(1).max(240), z.null(), z.undefined()])
+  .catch(undefined);
+
+const monthsBackSchema = z
+  .preprocess((val) => {
+    if (typeof val === 'string') {
+      const trimmed = val.trim();
+      if (!trimmed) return null;
+      const parsed = Number(trimmed);
+      return Number.isNaN(parsed) ? val : parsed;
+    }
+    return val;
+  }, z.number().int().min(1).max(36).nullable())
   .catch(null);
 
 export const vaultPlanSchema = z.object({
@@ -34,25 +53,32 @@ export const vaultPlanSchema = z.object({
   semanticQuery: z.string().trim().max(300).catch(''),
   searchTerms: z.array(z.string().trim().min(2).max(60)).max(3).catch([]),
   topic: z.enum(DOCUMENT_TOPICS).nullable().catch(null),
-  monthsBack: z.number().int().min(1).max(36).nullable().catch(null),
+  monthsBack: monthsBackSchema,
   update: z
     .object({
       title: z.string().trim().max(200).nullable().catch(null),
       topic: z.enum(DOCUMENT_TOPICS).nullable().catch(null),
       docType: z.enum(DOCUMENT_TYPES).nullable().catch(null),
       sender: z.string().trim().max(160).nullable().catch(null),
-      docDate: isoDateOrNull,
-      expiresAt: isoDateOrNull,
+      docDate: optionalNullableIsoDate,
+      expiresAt: optionalNullableIsoDate,
     })
-    .catch({ title: null, topic: null, docType: null, sender: null, docDate: null, expiresAt: null }),
+    .catch({
+      title: null,
+      topic: null,
+      docType: null,
+      sender: null,
+      docDate: undefined,
+      expiresAt: undefined,
+    }),
   fact: z
     .object({
       label: z.string().trim().max(120).nullable().catch(null),
-      value: z.string().trim().max(500).nullable().catch(null),
+      value: z.string().trim().max(1000).nullable().catch(null),
       category: z.enum(FACT_CATEGORIES).nullable().catch(null),
-      hint: z.string().trim().max(240).nullable().catch(null),
+      hint: optionalNullableHint,
     })
-    .catch({ label: null, value: null, category: null, hint: null }),
+    .catch({ label: null, value: null, category: null, hint: undefined }),
   factQuery: z.string().trim().max(120).catch(''),
   answer: z.string().trim().max(1500).catch(''),
 });
@@ -67,12 +93,12 @@ const PLAN_SYSTEM_PROMPT = `Ти си планиращ модул на AI аси
   "searchTerms": ["до 3 ключови термина, напр. Kinderzuschlag, Familienkasse, Sparkasse"],
   "topic": "${DOCUMENT_TOPICS.join(' | ')} | null",
   "monthsBack": "число (само ако се иска период в месеци назад, напр. 'последните 6 месеца') или null",
-  "update": { "title": null, "topic": null, "docType": "${DOCUMENT_TYPES.join(' | ')} | null", "sender": null, "docDate": "YYYY-MM-DD или null", "expiresAt": "YYYY-MM-DD или null" },
-  "fact": { "label": null, "value": null, "category": "${FACT_CATEGORIES.join(' | ')} | null", "hint": null },
+  "update": {},
+  "fact": { "label": null, "value": null, "category": "${FACT_CATEGORIES.join(' | ')} | null" },
   "factQuery": "кои факти се търсят/променят/изтриват (напр. IBAN) или празно",
   "answer": "кратък отговор на български САМО при action=chat_only"
 }
-Правила: update.* се попълва само за полетата, които потребителят иска да промени. Никога не поставяй пароли, ПИН кодове или тайни в fact.value — за тях action е "chat_only" с препоръка да се използва секция Пароли.
+Правила: В update включвай САМО полетата (title, topic, docType [${DOCUMENT_TYPES.join(' | ')}], sender, docDate, expiresAt), които потребителят иска да промени; пропускай непроменените полета, а за docDate/expiresAt/fact.hint подавай null ЕДИНСТВЕНО при изрично поискано изчистване. Никога не поставяй пароли, ПИН кодове или тайни в fact.value — за тях action е "chat_only" с препоръка да се използва секция Пароли.
 Днешната дата е подадена в полето "today"; за относителни дати (вчера, миналия месец) смятай спрямо нея.`;
 
 export interface PlanVaultActionInput {

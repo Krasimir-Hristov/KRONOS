@@ -54,13 +54,15 @@ export const loadCatalogDocumentsByIds = async (
   }
 };
 
+const CHAT_QUERY_EMBEDDING_TIMEOUT_MS = 2_000;
+
 const tryGenerateQueryEmbedding = async (query: string): Promise<string | null> => {
   const cleaned = redactSecretsFromFreeText(query).trim();
   if (!cleaned) {
     return null;
   }
   try {
-    return await generateTextEmbedding(cleaned);
+    return await generateTextEmbedding(cleaned, undefined, CHAT_QUERY_EMBEDDING_TIMEOUT_MS);
   } catch {
     // Graceful degradation: Full-Text + trigram search still works without a vector.
     return null;

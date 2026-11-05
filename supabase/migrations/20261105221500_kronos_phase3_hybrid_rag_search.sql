@@ -112,10 +112,17 @@ as $$
       and coalesce(d.metadata->>'pendingReview', 'false') <> 'true'
       and (p_topic is null or p_topic = '' or d.topic = p_topic)
       and (p_doc_type is null or p_doc_type = '' or d.doc_type = p_doc_type)
-      and coalesce(d.doc_date, (d.created_at at time zone 'UTC')::date)
-        >= coalesce(p_date_from, '-infinity'::date)
-      and coalesce(d.doc_date, (d.created_at at time zone 'UTC')::date)
-        <= coalesce(p_date_to, 'infinity'::date)
+      and (
+        (
+          d.doc_date is not null
+          and d.doc_date >= coalesce(p_date_from, '-infinity'::date)
+          and d.doc_date <= coalesce(p_date_to, 'infinity'::date)
+        )
+        or (
+          (d.created_at at time zone 'UTC')::date >= coalesce(p_date_from, '-infinity'::date)
+          and (d.created_at at time zone 'UTC')::date <= coalesce(p_date_to, 'infinity'::date)
+        )
+      )
   )
   select
     s.id,

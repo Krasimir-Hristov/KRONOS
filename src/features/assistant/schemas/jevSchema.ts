@@ -17,10 +17,34 @@ export const jevDecisionResponseSchema = z.object({
 export type JevDecisionResponse = z.infer<typeof jevDecisionResponseSchema>;
 export type JevAnswer = z.infer<typeof jevAnswerSchema>;
 
-export const routingDecisionSchema = z.object({
-  department: assistantDepartmentSchema,
-  intent: assistantIntentSchema,
-});
+const VAULT_ONLY_INTENTS = new Set([
+  'search_documents',
+  'save_or_update_document',
+  'delete_document',
+  'manage_fact',
+  'manage_secret',
+]);
+
+const BUREAUCRACY_ONLY_INTENTS = new Set([
+  'portal_assist',
+  'letter_or_form',
+  'draft_reply',
+]);
+
+export const routingDecisionSchema = z
+  .object({
+    department: assistantDepartmentSchema,
+    intent: assistantIntentSchema,
+  })
+  .transform((val) => {
+    if (VAULT_ONLY_INTENTS.has(val.intent)) {
+      return { department: 'vault_search_and_manage' as const, intent: val.intent };
+    }
+    if (BUREAUCRACY_ONLY_INTENTS.has(val.intent)) {
+      return { department: 'german_bureaucracy' as const, intent: val.intent };
+    }
+    return val;
+  });
 
 export type RoutingDecision = z.infer<typeof routingDecisionSchema>;
 
@@ -36,8 +60,11 @@ export const zoneCandidateSchema = z.object({
 
 export type ZoneCandidate = z.infer<typeof zoneCandidateSchema>;
 
+export type JevRerankStatus = 'ok' | 'skipped' | 'timeout' | 'error';
+
 export interface ZoneSplit {
   readonly zone1Ids: readonly string[];
   readonly zone2Ids: readonly string[];
   readonly usedJev: boolean;
+  readonly jevStatus: JevRerankStatus;
 }

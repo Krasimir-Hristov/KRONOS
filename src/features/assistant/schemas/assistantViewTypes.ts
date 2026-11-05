@@ -20,4 +20,8 @@ export interface AssistantWorkspaceSnapshot {
 
 export type AssistantActionResponse<T> =
   | { readonly ok: true; readonly data: T }
-  | { readonly ok: false; readonly errorMessage: string };
+  | {
+      readonly ok: false;
+      readonly errorMessage: string;
+      readonly partialData?: T;
+    };

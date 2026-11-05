@@ -2,6 +2,10 @@ import 'server-only';
 import { requireAuthAndPin } from '@/features/auth/server';
 import { createServerSupabaseClient } from '@/lib/supabase/supabaseServer';
 import type { Json } from '@/types/databaseTypes';
+import {
+  isSecretIntentMessage,
+  SECRET_CHAT_PLACEHOLDER,
+} from '../agents/keywordClassifier';
 import type {
   AssistantTurnPayload,
   ChatSessionSummary,
@@ -42,6 +46,32 @@ export const listChatSessions = async (): Promise<readonly ChatSessionSummary[]>
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Грешка при зареждане на разговорите.';
     throw new Error(msg, { cause: err });
+  }
+};
+
+export const getOwnedChatSessionSummary = async (
+  sessionId: string
+): Promise<ChatSessionSummary | null> => {
+  try {
+    const { userId } = await requireAuthAndPin({ redirectOnFail: false });
+    const supabase = await createServerSupabaseClient();
+    const { data, error } = await supabase
+      .from('chat_sessions')
+      .select('id, title, updated_at')
+      .eq('id', sessionId)
+      .eq('owner_id', userId)
+      .maybeSingle();
+
+    if (error || !data) {
+      return null;
+    }
+    return {
+      id: data.id,
+      title: data.title,
+      updatedAt: data.updated_at,
+    };
+  } catch {
+    return null;
   }
 };
 
@@ -120,38 +150,27 @@ export interface AppendChatMessageInput {
 
 export const appendChatMessage = async (input: AppendChatMessageInput): Promise<void> => {
   try {
-    const { userId } = await requireAuthAndPin({ redirectOnFail: false });
+    await requireAuthAndPin({ redirectOnFail: false });
     const supabase = await createServerSupabaseClient();
 
-    const { data: owned } = await supabase
-      .from('chat_sessions')
-      .select('id')
-      .eq('id', input.sessionId)
-      .eq('owner_id', userId)
-      .maybeSingle();
-    if (!owned) {
-      throw new Error('Разговорът не е намерен.');
-    }
-
     const metadata: Json = input.payload ? (input.payload as unknown as Json) : {};
-    const { error } = await supabase.from('chat_messages').insert({
-      session_id: input.sessionId,
-      sender_role: input.role,
-      content: input.content,
-      metadata,
-      zone1_document_ids: [...(input.zone1Ids ?? [])],
-      zone2_document_ids: [...(input.zone2Ids ?? [])],
+    const safeContent =
+      input.role === 'user' && isSecretIntentMessage(input.content)
+        ? SECRET_CHAT_PLACEHOLDER
+        : input.content;
+
+    const { error } = await supabase.rpc('append_chat_message', {
+      p_session_id: input.sessionId,
+      p_sender_role: input.role,
+      p_content: safeContent,
+      p_metadata: metadata,
+      p_zone1_document_ids: [...(input.zone1Ids ?? [])],
+      p_zone2_document_ids: [...(input.zone2Ids ?? [])],
     });
 
     if (error) {
       throw new Error('Неуспешен запис на съобщението.');
     }
-
-    await supabase
-      .from('chat_sessions')
-      .update({ updated_at: new Date().toISOString() })
-      .eq('id', input.sessionId)
-      .eq('owner_id', userId);
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Грешка при запис на съобщение.';
     throw new Error(msg, { cause: err });
@@ -167,10 +186,11 @@ export const getRecentChatHistory = async (
     const supabase = await createServerSupabaseClient();
     const { data, error } = await supabase
       .from('chat_messages')
-      .select('sender_role, content, created_at')
+      .select('id, sender_role, content, created_at')
       .eq('session_id', sessionId)
       .in('sender_role', ['user', 'assistant'])
       .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
       .limit(limit);
 
     if (error) {
@@ -178,7 +198,10 @@ export const getRecentChatHistory = async (
     }
     return [...(data ?? [])].reverse().map((row) => ({
       role: row.sender_role === 'assistant' ? ('assistant' as const) : ('user' as const),
-      content: row.content,
+      content:
+        row.sender_role === 'user' && isSecretIntentMessage(row.content)
+          ? SECRET_CHAT_PLACEHOLDER
+          : row.content,
     }));
   } catch {
     return [];

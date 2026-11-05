@@ -10,9 +10,22 @@ const SEARCH_LIMIT_PER_PASS = 30;
 const MAX_MERGED_DOCUMENTS = 40;
 
 export const subtractMonthsIso = (nowIso: string, months: number): string => {
-  const date = new Date(nowIso);
-  date.setUTCMonth(date.getUTCMonth() - months);
-  return date.toISOString().slice(0, 10);
+  const source = new Date(nowIso);
+  const srcYear = source.getUTCFullYear();
+  const srcMonth = source.getUTCMonth();
+  const srcDay = source.getUTCDate();
+
+  const targetMonthIndex = srcYear * 12 + srcMonth - months;
+  const targetYear = Math.floor(targetMonthIndex / 12);
+  const targetMonth = ((targetMonthIndex % 12) + 12) % 12;
+  const daysInTargetMonth = new Date(
+    Date.UTC(targetYear, targetMonth + 1, 0)
+  ).getUTCDate();
+  const clampedDay = Math.min(srcDay, daysInTargetMonth);
+
+  return new Date(Date.UTC(targetYear, targetMonth, clampedDay))
+    .toISOString()
+    .slice(0, 10);
 };
 
 export interface DocumentSearchOutcome {
@@ -20,17 +33,23 @@ export interface DocumentSearchOutcome {
   readonly usedVector: boolean;
 }
 
+export interface DocumentSearchOptions {
+  readonly allowTopicRelaxation?: boolean;
+  readonly useVector?: boolean;
+}
+
 export type HybridSearchFn = typeof searchDocumentsHybridRag;
 
 /**
  * Runs one semantic pass (vector + FTS on the full phrase) and one keyword pass per
- * search term (FTS/trigram only), then merges the unique hits in relevance order.
+ * search term (FTS/trigram only), then interleaves unique hits in balanced round-robin order.
  */
 export const runDocumentSearch = async (
   plan: Pick<VaultPlan, 'semanticQuery' | 'searchTerms' | 'topic' | 'monthsBack'>,
   fallbackQuery: string,
   nowIso: string,
-  search: HybridSearchFn = searchDocumentsHybridRag
+  search: HybridSearchFn = searchDocumentsHybridRag,
+  options?: DocumentSearchOptions
 ): Promise<DocumentSearchOutcome> => {
   const dateFrom = plan.monthsBack ? subtractMonthsIso(nowIso, plan.monthsBack) : null;
   const semanticQuery = plan.semanticQuery || fallbackQuery;
@@ -41,6 +60,7 @@ export const runDocumentSearch = async (
       topic,
       dateFrom,
       limit: SEARCH_LIMIT_PER_PASS,
+      ...(options?.useVector !== undefined ? { useVector: options.useVector } : {}),
     });
 
     const termResults: HybridSearchOutcome[] = [];
@@ -56,20 +76,37 @@ export const runDocumentSearch = async (
       );
     }
 
+    const buckets: readonly (readonly CatalogDocumentItem[])[] = [
+      semantic.items,
+      ...termResults.map((r) => r.items),
+    ];
+    const maxBucketLen = buckets.reduce((max, items) => Math.max(max, items.length), 0);
     const merged = new Map<string, CatalogDocumentItem>();
-    for (const doc of [...semantic.items, ...termResults.flatMap((r) => r.items)]) {
-      if (!merged.has(doc.id)) {
-        merged.set(doc.id, doc);
+
+    for (let idx = 0; idx < maxBucketLen && merged.size < MAX_MERGED_DOCUMENTS; idx += 1) {
+      for (const bucket of buckets) {
+        const doc = bucket[idx];
+        if (doc && !merged.has(doc.id)) {
+          merged.set(doc.id, doc);
+          if (merged.size >= MAX_MERGED_DOCUMENTS) {
+            break;
+          }
+        }
       }
     }
+
     return {
-      docs: [...merged.values()].slice(0, MAX_MERGED_DOCUMENTS),
+      docs: [...merged.values()],
       usedVector: semantic.usedVector,
     };
   };
 
   const firstPass = await runPasses(plan.topic);
-  if (firstPass.docs.length === 0 && plan.topic) {
+  if (
+    firstPass.docs.length === 0 &&
+    plan.topic &&
+    options?.allowTopicRelaxation !== false
+  ) {
     return runPasses(null);
   }
   return firstPass;

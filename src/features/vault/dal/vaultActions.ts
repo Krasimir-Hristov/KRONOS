@@ -73,6 +73,7 @@ export const createVaultFactAction = async (
     }
     const id = await createVaultFact(parsed.data);
     revalidatePath('/vault');
+    revalidatePath('/');
     return { ok: true, data: { id } };
   } catch (err) {
     return mapVaultError(err, 'Неуспешно запазване на записа.');
@@ -92,6 +93,7 @@ export const updateVaultFactAction = async (
     }
     await updateVaultFact(parsed.data);
     revalidatePath('/vault');
+    revalidatePath('/');
     return { ok: true, data: null };
   } catch (err) {
     return mapVaultError(err, 'Неуспешна промяна на записа.');
@@ -108,6 +110,7 @@ export const deleteVaultFactAction = async (
     }
     await purgeVaultFact(parsed.data.id);
     revalidatePath('/vault');
+    revalidatePath('/');
     return { ok: true, data: null };
   } catch (err) {
     return mapVaultError(err, 'Неуспешно изтриване на записа.');

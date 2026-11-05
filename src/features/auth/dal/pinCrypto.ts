@@ -3,10 +3,13 @@ import { decryptAesGcm, encryptAesGcm } from '@/lib/crypto/aesGcmCrypto';
 
 const SCRYPT_KEY_LENGTH = 32;
 
+export type PinCookiePurpose = 'session' | 'step_up';
+
 export interface PinCookiePayload {
   readonly uid: string;
   readonly exp: number;
   readonly nonce: string;
+  readonly purpose: PinCookiePurpose;
 }
 
 export const hashPin = (pin: string): string => {
@@ -35,13 +38,15 @@ export const verifyPinHash = (pin: string, storedHash: string): boolean => {
 export const createEncryptedPinCookie = (
   userId: string,
   ttlMinutes: number,
-  secretKey: string
+  secretKey: string,
+  purpose: PinCookiePurpose = 'session'
 ): string => {
   const expiresAtMs = Date.now() + ttlMinutes * 60 * 1000;
   const payload: PinCookiePayload = {
     uid: userId,
     exp: expiresAtMs,
     nonce: crypto.randomBytes(8).toString('hex'),
+    purpose,
   };
   return encryptAesGcm(JSON.stringify(payload), secretKey);
 };
@@ -49,15 +54,17 @@ export const createEncryptedPinCookie = (
 export const getVerifiedPinCookieExpiry = (
   cookieValue: string | undefined,
   expectedUserId: string,
-  secretKey: string
+  secretKey: string,
+  expectedPurpose: PinCookiePurpose = 'session'
 ): number | null => {
   if (!cookieValue) return null;
   try {
     const decrypted = decryptAesGcm(cookieValue, secretKey);
     if (!decrypted) return null;
 
-    const parsed = JSON.parse(decrypted) as PinCookiePayload;
+    const parsed = JSON.parse(decrypted) as Partial<PinCookiePayload>;
     if (parsed.uid !== expectedUserId) return null;
+    if (parsed.purpose !== expectedPurpose) return null;
     if (typeof parsed.exp !== 'number' || Date.now() > parsed.exp) return null;
 
     return parsed.exp;
@@ -69,7 +76,11 @@ export const getVerifiedPinCookieExpiry = (
 export const verifyEncryptedPinCookie = (
   cookieValue: string | undefined,
   expectedUserId: string,
-  secretKey: string
+  secretKey: string,
+  expectedPurpose: PinCookiePurpose = 'session'
 ): boolean => {
-  return getVerifiedPinCookieExpiry(cookieValue, expectedUserId, secretKey) !== null;
+  return (
+    getVerifiedPinCookieExpiry(cookieValue, expectedUserId, secretKey, expectedPurpose) !==
+    null
+  );
 };

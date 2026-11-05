@@ -105,7 +105,8 @@ export const assistantActionCardSchema = z.discriminatedUnion('kind', [
   }),
   z.object({
     kind: z.literal('secrets_gate'),
-    mode: z.enum(['browse', 'create']),
+    mode: z.enum(['browse', 'create', 'edit']),
+    purpose: z.literal('step_up').default('step_up'),
     searchHint: z.string().max(120).nullable().default(null),
   }),
   z.object({

@@ -18,6 +18,9 @@ export interface KeywordClassifierInput {
   readonly attachment: ChatAttachmentInput | null;
 }
 
+export const SECRET_CHAT_PLACEHOLDER =
+  '🔒 [Заявка за парола/тайна — съдържанието не се записва в чата]';
+
 export const isSecretIntentMessage = (message: string): boolean =>
   isSuspectedSecretFact(message, null);
 
@@ -36,16 +39,16 @@ export const classifyByKeywords = (input: KeywordClassifierInput): RoutingDecisi
   if (DRAFT_REGEX.test(text)) {
     return decision('german_bureaucracy', 'draft_reply');
   }
+  if (DELETE_REGEX.test(text)) {
+    return FACT_REGEX.test(text)
+      ? decision('vault_search_and_manage', 'manage_fact')
+      : decision('vault_search_and_manage', 'delete_document');
+  }
   if (PORTAL_REGEX.test(text)) {
     return decision('german_bureaucracy', 'portal_assist');
   }
   if (hasAttachment && !input.attachment?.saveToVault) {
     return decision('german_bureaucracy', 'letter_or_form');
-  }
-  if (DELETE_REGEX.test(text)) {
-    return FACT_REGEX.test(text)
-      ? decision('vault_search_and_manage', 'manage_fact')
-      : decision('vault_search_and_manage', 'delete_document');
   }
   if (FACT_REGEX.test(text)) {
     return decision('vault_search_and_manage', 'manage_fact');

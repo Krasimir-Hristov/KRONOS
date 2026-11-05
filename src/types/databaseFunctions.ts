@@ -21,12 +21,31 @@ export type SearchDocumentRpcRow = {
 };
 
 export type PublicDatabaseFunctions = {
+  append_chat_message: {
+    Args: {
+      p_content: string;
+      p_metadata?: Json;
+      p_sender_role: string;
+      p_session_id: string;
+      p_zone1_document_ids?: string[];
+      p_zone2_document_ids?: string[];
+    };
+    Returns: string;
+  };
   save_deduplicated_vault_facts: {
     Args: { p_candidates?: Json; p_source_document_id: string };
     Returns: {
       inserted_count: number;
       skipped_duplicates: number;
     }[];
+  };
+  scrub_purged_documents_from_chat: {
+    Args: { p_document_ids: string[] };
+    Returns: undefined;
+  };
+  scrub_purged_facts_from_chat: {
+    Args: { p_fact_ids: string[] };
+    Returns: undefined;
   };
   search_documents_classic: {
     Args: {
