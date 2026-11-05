@@ -36,7 +36,7 @@ describe('envConfig & aiModelsConfig', () => {
     ).toBe(false);
   });
 
-  it('exposes canonical OpenRouter endpoints, safety caps, and model overrides', () => {
+  it('exposes canonical OpenRouter endpoints, safety caps, and model overrides from env', () => {
     expect(OPENROUTER_ENDPOINTS.decisions).toBe('https://openrouter.ai/api/alpha/decisions');
     expect(EMBEDDING_DIMENSIONS).toBe(1536);
     expect(JEV_TIMEOUT_MS).toBe(1500);
@@ -49,8 +49,16 @@ describe('envConfig & aiModelsConfig', () => {
 
     const overridden = getAiModelsConfig({
       OPENROUTER_JEV_MODEL: 'typesafe/jev-1.14',
+      OPENROUTER_CHAT_FAST_MODEL: 'anthropic/claude-3.5-haiku',
+      OPENROUTER_CHAT_PRO_MODEL: 'anthropic/claude-3.7-sonnet',
+      OPENROUTER_VISION_OCR_MODEL: 'google/gemini-2.5-flash',
+      OPENROUTER_EMBEDDING_MODEL: 'openai/text-embedding-3-large',
     });
     expect(overridden.jevDispatcher).toBe('typesafe/jev-1.14');
+    expect(overridden.chatFast).toBe('anthropic/claude-3.5-haiku');
+    expect(overridden.chatPro).toBe('anthropic/claude-3.7-sonnet');
+    expect(overridden.visionOcr).toBe('google/gemini-2.5-flash');
+    expect(overridden.embedding).toBe('openai/text-embedding-3-large');
   });
 
   it('throws an error when required Supabase config or crypto secrets are missing or invalid', () => {
