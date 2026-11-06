@@ -104,7 +104,12 @@ export const setupOrVerifyPinAction = async (input: unknown): Promise<ActionResp
         return { ok: false, errorMessage: 'Грешка при запис на новия ПИН код.' };
       }
 
-      const cookieVal = createEncryptedPinCookie(user.id, PIN_TTL_MINUTES, pinSecret);
+      const cookieVal = createEncryptedPinCookie(
+        user.id,
+        PIN_TTL_MINUTES,
+        pinSecret,
+        'session'
+      );
       cookieStore.set(PIN_COOKIE_NAME, cookieVal, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
@@ -143,7 +148,12 @@ export const setupOrVerifyPinAction = async (input: unknown): Promise<ActionResp
         .update({ pin_failed_attempts: 0, pin_locked_until: null })
         .eq('id', user.id);
 
-      const cookieVal = createEncryptedPinCookie(user.id, PIN_TTL_MINUTES, pinSecret);
+      const cookieVal = createEncryptedPinCookie(
+        user.id,
+        PIN_TTL_MINUTES,
+        pinSecret,
+        'session'
+      );
       cookieStore.set(PIN_COOKIE_NAME, cookieVal, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
@@ -212,7 +222,12 @@ export const verifyStepUpPinAction = async (
     const { pinSecret } = getCryptoSecrets();
     const cookieStore = await cookies();
     const expiresAtMs = Date.now() + STEP_UP_TTL_MINUTES * 60 * 1000;
-    const stepUpCookie = createEncryptedPinCookie(user.id, STEP_UP_TTL_MINUTES, pinSecret);
+    const stepUpCookie = createEncryptedPinCookie(
+      user.id,
+      STEP_UP_TTL_MINUTES,
+      pinSecret,
+      'step_up'
+    );
 
     cookieStore.set(STEP_UP_PIN_COOKIE_NAME, stepUpCookie, {
       httpOnly: true,

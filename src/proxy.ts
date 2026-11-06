@@ -97,10 +97,15 @@ export const proxy = async (request: NextRequest): Promise<NextResponse> => {
       return response;
     }
 
-    // 2. Check 4-digit PIN verification cookie presence and cryptographic validity
+    // 2. Check 4-digit PIN verification cookie presence, purpose ('session'), and cryptographic validity
     const pinCookie = request.cookies.get(PIN_COOKIE_NAME)?.value;
     const { pinSecret } = getCryptoSecrets();
-    const isPinValid = verifyEncryptedPinCookie(pinCookie, user.id, pinSecret);
+    const isPinValid = verifyEncryptedPinCookie(
+      pinCookie,
+      user.id,
+      pinSecret,
+      'session'
+    );
 
     if (!isPinValid) {
       if (pathname !== '/pin') {
@@ -120,7 +125,8 @@ export const proxy = async (request: NextRequest): Promise<NextResponse> => {
     const refreshedCookie = createEncryptedPinCookie(
       user.id,
       PIN_TTL_MINUTES,
-      pinSecret
+      pinSecret,
+      'session'
     );
     response.cookies.set(PIN_COOKIE_NAME, refreshedCookie, {
       httpOnly: true,

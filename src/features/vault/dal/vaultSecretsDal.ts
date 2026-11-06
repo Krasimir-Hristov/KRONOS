@@ -152,23 +152,35 @@ export const updateVaultSecret = async (
   }
 };
 
-export const purgeVaultSecret = async (secretId: string): Promise<void> => {
+export const purgeVaultSecretsBatch = async (
+  secretIds: readonly string[]
+): Promise<number> => {
   try {
     const { userId } = await requireStepUpPin();
+    if (secretIds.length === 0) {
+      return 0;
+    }
     const supabase = await createServerSupabaseClient();
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('vault_items')
       .delete()
-      .eq('id', secretId)
       .eq('owner_id', userId)
-      .eq('is_secret', true);
+      .eq('is_secret', true)
+      .in('id', [...secretIds])
+      .select('id');
 
     if (error) {
       throw new Error('Неуспешно физическо изтриване на паролата.');
     }
+
+    return data?.length ?? 0;
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Грешка при Hard Purge на парола.';
     throw new Error(msg, { cause: err });
   }
+};
+
+export const purgeVaultSecret = async (secretId: string): Promise<void> => {
+  await purgeVaultSecretsBatch([secretId]);
 };

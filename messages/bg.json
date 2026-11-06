@@ -93,10 +93,22 @@
   },
   "chat": {
     "title": "Главен AI Асистент",
-    "subtitle": "Оркестрация през LangGraph, двузоново Jev търсене и помощ за немска бюрокрация.",
+    "subtitle": "Оркестрация през LangGraph, двузоново Jev търсене (Зона 1 + Зона 2) и помощ за немски онлайн портали и PDF молби.",
     "stageBadge": "ФАЗА 3 АКТИВНА",
-    "stageRole": "СУПЕРВАЙЗЪР",
-    "inputPlaceholder": "Попитайте за документи, писма, Wohngeld, Kinderzuschlag...",
-    "sendButton": "Изпрати"
+    "stageRole": "LANGGRAPH + JEV",
+    "inputPlaceholder": "Попитайте за документ, поставете скрийншот (Ctrl+V) от Wohngeld / Kinderzuschlag или прикачете писмо...",
+    "sendButton": "Изпрати",
+    "newSession": "Нов разговор",
+    "sessionsTitle": "Разговори",
+    "emptySessions": "Още няма проведени разговори.",
+    "attachFile": "Прикачи PDF или снимка",
+    "saveToVaultToggle": "Запази копие в RAG Сейфа",
+    "pasteHint": "Поддържа директно поставяне на скрийншот с Ctrl+V и файлове до 50 MB",
+    "zone1Title": "ЗОНА 1 • Най-точно попадение (Jev Reranking)",
+    "zone2Title": "ЗОНА 2 • Всички останали сходни документи (от най-нови към най-стари)",
+    "portalFilesTitle": "Подготвени документи за онлайн портал (отделни файлове по подразбиране)",
+    "docDateLabel": "Дата от документа",
+    "uploadedAtLabel": "Качен на",
+    "offlineBanner": "OpenRouter AI е временно недостъпен — показани са локални резултати от вашия сейф."
   }
 }

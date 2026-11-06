@@ -21,7 +21,7 @@ const getInitialStepUpExpiry = async (userId: string): Promise<number | null> =>
     const cookieStore = await cookies();
     const stepUpCookie = cookieStore.get(STEP_UP_PIN_COOKIE_NAME)?.value;
     const { pinSecret } = getCryptoSecrets();
-    return getVerifiedPinCookieExpiry(stepUpCookie, userId, pinSecret);
+    return getVerifiedPinCookieExpiry(stepUpCookie, userId, pinSecret, 'step_up');
   } catch {
     return null;
   }

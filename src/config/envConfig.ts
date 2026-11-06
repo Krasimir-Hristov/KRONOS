@@ -14,6 +14,15 @@ const serverEnvSchema = publicEnvSchema.extend({
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
   SUPABASE_STORAGE_BUCKET: z.string().min(1).default('kronos-vault'),
   OPENROUTER_API_KEY: z.string().min(1).optional(),
+  OPENROUTER_JEV_MODEL: z.string().min(1).optional(),
+  OPENROUTER_CHAT_FAST_MODEL: z.string().min(1).optional(),
+  OPENROUTER_CHAT_PRO_MODEL: z.string().min(1).optional(),
+  OPENROUTER_VISION_OCR_MODEL: z.string().min(1).optional(),
+  OPENROUTER_EMBEDDING_MODEL: z.string().min(1).optional(),
+  OPENROUTER_IMAGE_FAST_MODEL: z.string().min(1).optional(),
+  OPENROUTER_IMAGE_PRO_MODEL: z.string().min(1).optional(),
+  OPENROUTER_STT_MODEL: z.string().min(1).optional(),
+  OPENROUTER_TTS_MODEL: z.string().min(1).optional(),
 });
 
 export type PublicEnvConfig = z.infer<typeof publicEnvSchema>;

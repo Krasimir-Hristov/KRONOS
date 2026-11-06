@@ -59,8 +59,10 @@ export const useVaultSecretsQuery = (enabled: boolean, onStepUpRequired: () => v
 
 export const useVaultFactMutations = () => {
   const queryClient = useQueryClient();
-  const invalidate = () =>
-    queryClient.invalidateQueries({ queryKey: VAULT_QUERY_KEYS.facts });
+  const invalidate = async () => {
+    await queryClient.invalidateQueries({ queryKey: VAULT_QUERY_KEYS.facts });
+    await queryClient.invalidateQueries({ queryKey: ['assistant', 'workspace'] });
+  };
 
   const createFact = useMutation({
     mutationFn: async (input: VaultFactInput) => {

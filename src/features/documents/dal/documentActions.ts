@@ -193,6 +193,7 @@ export const updateDocumentMetaAction = async (
     }
     await updateApprovedDocumentMetadata(parsed.data);
     revalidatePath('/documents');
+    revalidatePath('/');
     return { ok: true, data: null };
   } catch (err) {
     console.error('[DocumentActions] updateDocumentMetaAction error:', err);
@@ -233,6 +234,7 @@ export const purgeDocumentsAction = async (
     const res = await purgeDocumentsHard(parsed.data.ids);
     revalidatePath('/documents');
     revalidatePath('/vault');
+    revalidatePath('/');
     return { ok: true, data: res };
   } catch (err) {
     console.error('[DocumentActions] purgeDocumentsAction error:', err);

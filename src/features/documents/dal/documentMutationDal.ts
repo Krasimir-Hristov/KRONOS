@@ -6,12 +6,12 @@ import { createServerSupabaseClient } from '@/lib/supabase/supabaseServer';
 import type { Json } from '@/types/databaseTypes';
 import {
   approveDocumentsBatchSchema,
+  patchDocumentMetaSchema,
   registerPendingDocumentSchema,
-  updateDocumentMetaSchema,
   type ApproveDocumentItemInput,
   type CatalogDocumentItem,
+  type PatchDocumentMetaInput,
   type RegisterPendingDocumentInput,
-  type UpdateDocumentMetaInput,
 } from '../schemas/documentSchema';
 import { DOCUMENT_SELECT_COLUMNS, mapRowToCatalogItem } from './documentDal';
 
@@ -156,23 +156,32 @@ export const approveDocumentsBatch = async (
 };
 
 export const updateApprovedDocumentMetadata = async (
-  input: UpdateDocumentMetaInput
+  input: PatchDocumentMetaInput
 ): Promise<void> => {
   try {
     const { userId } = await requireAuthAndPin({ redirectOnFail: false });
-    const validated = updateDocumentMetaSchema.parse(input);
+    const validated = patchDocumentMetaSchema.parse(input);
     const supabase = await createServerSupabaseClient();
+
+    const dbPatch: {
+      title?: string;
+      topic?: string;
+      doc_type?: string;
+      sender?: string;
+      doc_date?: string | null;
+      expires_at?: string | null;
+    } = {};
+
+    if (validated.title !== undefined) dbPatch.title = validated.title;
+    if (validated.topic !== undefined) dbPatch.topic = validated.topic;
+    if (validated.docType !== undefined) dbPatch.doc_type = validated.docType;
+    if (validated.sender !== undefined) dbPatch.sender = validated.sender;
+    if (validated.docDate !== undefined) dbPatch.doc_date = validated.docDate;
+    if (validated.expiresAt !== undefined) dbPatch.expires_at = validated.expiresAt;
 
     const { data, error } = await supabase
       .from('documents')
-      .update({
-        title: validated.title,
-        topic: validated.topic,
-        doc_type: validated.docType,
-        sender: validated.sender,
-        doc_date: validated.docDate,
-        expires_at: validated.expiresAt,
-      })
+      .update(dbPatch)
       .eq('id', validated.id)
       .eq('owner_id', userId)
       .select('id');

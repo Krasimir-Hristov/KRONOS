@@ -57,7 +57,8 @@ export const serializePgVector = (vector: readonly number[]): string => {
 
 export const generateTextEmbedding = async (
   inputText: string,
-  fetchImpl: typeof fetch = globalThis.fetch
+  fetchImpl: typeof fetch = globalThis.fetch,
+  timeoutMs = 25_000
 ): Promise<string> => {
   try {
     const trimmed = inputText.trim();
@@ -84,7 +85,7 @@ export const generateTextEmbedding = async (
         input: trimmed.slice(0, MAX_EMBEDDING_CHAR_LENGTH + 2000),
         dimensions: EMBEDDING_DIMENSIONS,
       }),
-      signal: AbortSignal.timeout(25_000),
+      signal: AbortSignal.timeout(timeoutMs),
     });
 
     if (!response.ok) {

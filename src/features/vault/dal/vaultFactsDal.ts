@@ -153,26 +153,45 @@ export const updateVaultFact = async (input: VaultFactUpdateInput): Promise<void
   }
 };
 
-export const purgeVaultFact = async (factId: string): Promise<void> => {
+export const purgeVaultFactsBatch = async (
+  factIds: readonly string[]
+): Promise<number> => {
   try {
     const { userId } = await requireAuthAndPin({ redirectOnFail: false });
+    if (factIds.length === 0) {
+      return 0;
+    }
     const supabase = await createServerSupabaseClient();
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('vault_items')
       .delete()
-      .eq('id', factId)
       .eq('owner_id', userId)
-      .eq('is_secret', false);
+      .eq('is_secret', false)
+      .in('id', [...factIds])
+      .select('id');
 
     if (error) {
       throw new Error('Неуспешно физическо изтриване на записа.');
     }
+
+    const { error: scrubErr } = await supabase.rpc('scrub_purged_facts_from_chat', {
+      p_fact_ids: [...factIds],
+    });
+    if (scrubErr) {
+      throw new Error('Грешка при почистване на изтритите факти от чат историята.');
+    }
+
+    return data?.length ?? 0;
   } catch (err) {
     const msg =
       err instanceof Error ? err.message : 'Грешка при изтриване на личен факт.';
     throw new Error(msg, { cause: err });
   }
+};
+
+export const purgeVaultFact = async (factId: string): Promise<void> => {
+  await purgeVaultFactsBatch([factId]);
 };
 
 export const saveApprovedFactsDeduplicated = async (
