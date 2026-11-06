@@ -37,6 +37,8 @@ const isPublicRoute = (pathname: string): boolean => {
     pathname.startsWith('/auth/') ||
     pathname.startsWith('/api/cron/') ||
     pathname === '/favicon.ico' ||
+    pathname === '/icon' ||
+    pathname === '/apple-icon' ||
     pathname.startsWith('/_next')
   ) {
     return true;

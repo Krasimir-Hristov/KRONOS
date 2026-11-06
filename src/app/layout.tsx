@@ -1,5 +1,5 @@
 import React from 'react';
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import { NextIntlClientProvider } from 'next-intl';
 import { getMessages } from 'next-intl/server';
@@ -18,6 +18,12 @@ export const metadata: Metadata = {
   },
   description:
     'KRONOS (Κρόνος) — Личен модулен AI Асистент и Документен Сейф за документи (DE/BG/EL), криптирани пароли и немска бюрокрация.',
+};
+
+export const viewport: Viewport = {
+  themeColor: '#020617',
+  width: 'device-width',
+  initialScale: 1,
 };
 
 interface RootLayoutProps {
