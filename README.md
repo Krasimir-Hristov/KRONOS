@@ -15,3 +15,12 @@
 - **База данни, Вход & Файлов Сейф:** **Supabase** (`@supabase/supabase-js` + `@supabase/ssr` + Supabase MCP типове, PostgreSQL `pgvector(1536)` HNSW, Full-Text Search, RLS и **Supabase Storage** с директни Signed URLs до `50 MB` и изолиран адаптер за лесна бъдеща миграция при нужда) + **4-цифрен ПИН код**
 - **AI Оркестрация:** OpenRouter API + LangChain & LangGraph (`@langchain/core`, `@langchain/langgraph`, `@langchain/openai`) + `typesafe/jev` Decisions API
 - **Качество & Сигурност:** `src/proxy.ts` (CVE-2025-29927 Header Scrubbing), `.coderabbit.yaml` и строг Phase Gate (`pnpm verify`)
+
+
+## Деплой във Vercel (Production)
+
+1. Импортирай репото във Vercel (Framework: Next.js). Cron задачата `/api/cron/keep-alive` е описана във `vercel.json`.
+2. Задай променливите от `.env.example` в Project Settings → Environment Variables. Генерирай ключове с `openssl rand -hex 32` за `KRONOS_PIN_SECRET`, `KRONOS_VAULT_ENCRYPTION_KEY` и `CRON_SECRET` (Vercel изпраща `CRON_SECRET` като `Authorization: Bearer`).
+3. Постави `NEXT_PUBLIC_APP_URL` на реалния Production адрес.
+4. В Supabase включи *Authentication → Password Security → Leaked Password Protection*.
+5. За инсталиране като PWA отвори сайта на телефона и избери „Добави към началния екран“.
