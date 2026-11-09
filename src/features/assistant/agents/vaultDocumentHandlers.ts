@@ -5,6 +5,7 @@ import {
   updateApprovedDocumentMetadata,
 } from '@/features/documents/server';
 import { purgeVaultFactsBatch } from '@/features/vault/server';
+import { confirmDeleteInputSchema } from '../schemas/assistantSchema';
 import type { JevRerankStatus } from '../schemas/jevSchema';
 import type { HandlerOutput, VaultHandlerContext } from './agentTypes';
 import { runDocumentSearch, type HybridSearchFn } from './vaultDocumentSearch';
@@ -14,7 +15,7 @@ const NOT_FOUND_TEXT =
   'Не намерих подходящ документ. Опитайте с друга ключова дума (напр. институция или тема) или прегледайте Документния Сейф.';
 
 export const CONVERSATIONAL_DELETE_CONFIRM_REGEX =
-  /^(?:да|потвърждавам|съгласен\s+съм|изтрий\s+(?:го|ги|я|всички)|да[,.\s]+(?:изтрий|потвърждавам)|потвърждавам\s+изтриването|yes[,.\s]*delete)/i;
+  /^\s*(?:да|потвърждавам|съгласен\s+съм|изтрий\s+(?:го|ги|я|всички)|да[,.\s]+(?:изтрий(?:\s+(?:го|ги|я|всички|завинаги))?|потвърждавам(?:\s+изтриването)?)|потвърждавам\s+изтриването|yes[,.\s]*delete(?:\s+(?:it|them))?)(?![\p{L}\p{N}])[.!?\s]*$/iu;
 
 export interface DocumentHandlerDeps {
   readonly search?: HybridSearchFn;
@@ -37,25 +38,16 @@ export const tryExecutePendingDeleteConfirmation = async (
     return null;
   }
 
-  const pending = previousAgentState.pendingConfirmDelete as
-    | {
-        readonly target?: unknown;
-        readonly ids?: unknown;
-      }
-    | undefined;
-
-  if (!pending || !Array.isArray(pending.ids) || pending.ids.length === 0) {
-    return null;
-  }
-
-  const validIds = pending.ids.filter(
-    (id): id is string => typeof id === 'string' && id.length > 0
+  const parsedPending = confirmDeleteInputSchema.safeParse(
+    previousAgentState.pendingConfirmDelete
   );
-  if (validIds.length === 0) {
+  if (!parsedPending.success) {
     return null;
   }
 
-  if (pending.target === 'documents') {
+  const { target, ids: validIds } = parsedPending.data;
+
+  if (target === 'documents') {
     const res = await purgeDocumentsHard(validIds);
     return {
       replyText: `✅ Потвърдено! Изтрих завинаги (100% Hard Purge) ${res.purgedCount} документа (физически файл в Storage + OCR + вектори).`,
@@ -72,7 +64,7 @@ export const tryExecutePendingDeleteConfirmation = async (
     };
   }
 
-  if (pending.target === 'facts') {
+  if (target === 'facts') {
     const purgedCount = await purgeVaultFactsBatch(validIds);
     return {
       replyText: `✅ Потвърдено! Изтрих завинаги (100% Hard Purge) ${purgedCount} лични записа от сейфа.`,

@@ -1,5 +1,8 @@
 import { unzipSync } from 'fflate';
 
+const MAX_UNZIPPED_XML_ENTRY_BYTES = 15 * 1024 * 1024; // 15 MB per XML entry
+const MAX_TOTAL_UNZIPPED_BYTES = 30 * 1024 * 1024; // 30 MB total per archive
+
 export const TEXT_AND_OFFICE_MIME_TYPES = new Set([
   'text/html',
   'text/plain',
@@ -35,7 +38,9 @@ const decodeXmlEntities = (input: string): string =>
     .replace(/&apos;|&#39;/gi, "'")
     .replace(/&#(\d+);/g, (_, code) => {
       const num = Number(code);
-      return Number.isFinite(num) ? String.fromCodePoint(num) : '';
+      return Number.isInteger(num) && num >= 1 && num <= 0x10ffff
+        ? String.fromCodePoint(num)
+        : '';
     });
 
 export const extractHtmlText = (rawHtml: string): string => {
@@ -59,10 +64,18 @@ export const extractHtmlText = (rawHtml: string): string => {
 };
 
 export const extractDocxText = (bytes: Uint8Array): string => {
-  const archive = unzipSync(bytes);
+  const archive = unzipSync(bytes, {
+    filter: (file) =>
+      file.name === 'word/document.xml' &&
+      (file.originalSize === undefined ||
+        file.originalSize <= MAX_UNZIPPED_XML_ENTRY_BYTES),
+  });
   const docXmlBytes = archive['word/document.xml'];
   if (!docXmlBytes) {
     throw new Error('Липсва word/document.xml във файла .docx.');
+  }
+  if (docXmlBytes.byteLength > MAX_UNZIPPED_XML_ENTRY_BYTES) {
+    throw new Error('Разархивираният XML запис надвишава допустимия лимит.');
   }
 
   const xml = decodeUtf8(docXmlBytes);
@@ -87,7 +100,25 @@ export const extractDocxText = (bytes: Uint8Array): string => {
 };
 
 export const extractXlsxText = (bytes: Uint8Array): string => {
-  const archive = unzipSync(bytes);
+  const archive = unzipSync(bytes, {
+    filter: (file) =>
+      (file.name === 'xl/sharedStrings.xml' ||
+        /^xl\/worksheets\/sheet\d+\.xml$/i.test(file.name)) &&
+      (file.originalSize === undefined ||
+        file.originalSize <= MAX_UNZIPPED_XML_ENTRY_BYTES),
+  });
+
+  let totalUnzippedBytes = 0;
+  for (const entryBytes of Object.values(archive)) {
+    if (entryBytes.byteLength > MAX_UNZIPPED_XML_ENTRY_BYTES) {
+      throw new Error('Разархивиран лист във файла .xlsx надвишава допустимия лимит.');
+    }
+    totalUnzippedBytes += entryBytes.byteLength;
+    if (totalUnzippedBytes > MAX_TOTAL_UNZIPPED_BYTES) {
+      throw new Error('Общият разархивиран обем на .xlsx надвишава допустимия лимит.');
+    }
+  }
+
   const sharedStringsBytes = archive['xl/sharedStrings.xml'];
   const sharedStrings: string[] = [];
 
@@ -115,12 +146,17 @@ export const extractXlsxText = (bytes: Uint8Array): string => {
 
     for (const rowMatch of rowMatches) {
       const rowXml = rowMatch[1] ?? '';
-      const cellMatches = [...rowXml.matchAll(/<c\b([^>]*)>([\s\S]*?)<\/c>/gi)];
+      const cellMatches = [
+        ...rowXml.matchAll(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/gi),
+      ];
       const cells: string[] = [];
 
       for (const cell of cellMatches) {
         const attrs = cell[1] ?? '';
-        const body = cell[2] ?? '';
+        const body = cell[2];
+        if (body === undefined) {
+          continue;
+        }
         const typeMatch = attrs.match(/\bt="([^"]+)"/i);
         const cellType = typeMatch?.[1] ?? '';
 

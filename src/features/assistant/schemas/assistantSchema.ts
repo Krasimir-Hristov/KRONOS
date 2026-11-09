@@ -2,6 +2,9 @@ import { z } from 'zod';
 import { ALLOWED_MIME_TYPES, MAX_FILE_SIZE_BYTES } from '@/features/storage';
 import { vaultCategorySchema } from '@/features/vault';
 
+export const SAVE_TO_RAG_REGEX =
+  /(?:запази|запиши|добави|качи)(?:\s+(?:го|я|това|файла|документа|снимката))?\s+в\s+(?:rag\s+)?сейфа|(?:запази|запиши)\s+(?:този\s+|тази\s+)?(?:файл(?:а)?|документ(?:а)?|снимка(?:та)?)|(?:^|[.,!?\s])(?:запази|запиши)\s+(?:го|я|това)(?:$|[.,!?\s])|\bsave\s+(?:it\s+|this\s+|the\s+(?:file|document|image)\s+)?to\s+(?:the\s+)?(?:rag\s+)?vault\b|\b(?:im\s+tresor\s+speichern|in\s+den\s+tresor\s+speichern|(?:dokument|datei|bild)\s+speichern)\b/i;
+
 export const ASSISTANT_DEPARTMENTS = [
   'general_chat',
   'vault_search_and_manage',

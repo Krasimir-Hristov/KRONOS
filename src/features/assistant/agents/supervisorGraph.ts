@@ -113,19 +113,13 @@ export const runKronosSupervisorGraph = async (
   const nowIso = input.nowIso ?? new Date().toISOString();
 
   const supervisorNode = async (state: SupervisorGraphState) => {
-    const ingested =
-      state.ingestedAttachment ??
-      (state.attachment
-        ? await ingestAttachmentForSupervisor(state.attachment, deps)
-        : null);
-
     const vaultPrevState = state.agentStatesByDepartment.vault_search_and_manage ?? null;
     if (
       vaultPrevState?.pendingConfirmDelete &&
       CONVERSATIONAL_DELETE_CONFIRM_REGEX.test(state.userMessage.trim())
     ) {
       return {
-        ingestedAttachment: ingested,
+        ingestedAttachment: state.ingestedAttachment,
         routedDepartment: 'vault_search_and_manage' as const,
         routedIntent: 'delete_document' as const,
         routedTier: 'local' as const,
@@ -133,6 +127,12 @@ export const runKronosSupervisorGraph = async (
         stepCount: 1,
       };
     }
+
+    const ingested =
+      state.ingestedAttachment ??
+      (state.attachment
+        ? await ingestAttachmentForSupervisor(state.attachment, deps)
+        : null);
 
     const attachmentDigest = buildAttachmentRoutingDigest(ingested, state.attachment);
 

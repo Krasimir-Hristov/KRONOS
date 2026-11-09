@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { CatalogDocumentItem } from '@/features/documents';
 import { vaultPlanSchema } from './vaultAgentPlanner';
+import { CONVERSATIONAL_DELETE_CONFIRM_REGEX } from './vaultDocumentHandlers';
 import { runDocumentSearch, subtractMonthsIso } from './vaultDocumentSearch';
 import { executeVaultAgent } from './vaultSearchAndManageAgent';
 
@@ -191,5 +192,19 @@ describe('vaultSearchAndManageAgent', () => {
     expect(parsedPlan.update.expiresAt).toBeNull();
     expect(parsedPlan.fact.hint).toBeUndefined();
     expect(parsedPlan.fact.value).toHaveLength(950);
+  });
+
+  it('accepts explicit delete confirmations and rejects false-positive phrases starting with да', () => {
+    expect(CONVERSATIONAL_DELETE_CONFIRM_REGEX.test('Да, изтрий го')).toBe(true);
+    expect(CONVERSATIONAL_DELETE_CONFIRM_REGEX.test('Потвърждавам изтриването.')).toBe(
+      true
+    );
+    expect(CONVERSATIONAL_DELETE_CONFIRM_REGEX.test('Дай ми последния документ')).toBe(
+      false
+    );
+    expect(CONVERSATIONAL_DELETE_CONFIRM_REGEX.test('Дали имам писмо от вчера?')).toBe(
+      false
+    );
+    expect(CONVERSATIONAL_DELETE_CONFIRM_REGEX.test('Да не го изтриваш')).toBe(false);
   });
 });

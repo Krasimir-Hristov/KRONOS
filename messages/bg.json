@@ -126,6 +126,19 @@
     "portalFilesTitle": "Подготвени документи за онлайн портал (отделни файлове по подразбиране)",
     "docDateLabel": "Дата от документа",
     "uploadedAtLabel": "Качен на",
-    "offlineBanner": "OpenRouter AI е временно недостъпен — показани са локални резултати от вашия сейф."
+    "offlineBanner": "OpenRouter AI е временно недостъпен — показани са локални резултати от вашия сейф.",
+    "voiceModeGroupAria": "Режим на общуване с KRONOS",
+    "voiceModeTextAria": "Режим писане с клавиатура",
+    "voiceModeTextLabel": "Текст",
+    "voiceModeDictateAria": "Режим гласово диктуване в полето за текст",
+    "voiceModeDictateLabel": "Диктуване",
+    "voiceModeHandsFreeAria": "Режим гласов разговор без ръце (Hands-Free)",
+    "voiceModeHandsFreeLabel": "Гласов разговор",
+    "voiceStopSpeakingAria": "Спри гласовото четене",
+    "voiceStopSpeakingLabel": "Спри гласа",
+    "voiceStopMicAria": "Спри микрофона",
+    "voiceStartMicAria": "Включи микрофона",
+    "voiceListeningLabel": "Слушам... (Спри)",
+    "voiceSpeakNowLabel": "Говори сега"
   }
 }

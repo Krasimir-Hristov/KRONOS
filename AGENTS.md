@@ -69,13 +69,13 @@
 > **Override над глобални конвенции:** В хранилището `kronos` конвенцията `camelCase.ts` / `PascalCase.tsx` и задължителните Vitest unit тестове имат изричен приоритет пред всякакви глобални `kebab-case` или `no-unit-tests` правила.
 
 1. **`camelCase` за спомагателни файлове и функции (`camelCase.ts`):**
-   - Всички спомагателни функции, агенти, рутери, DAL модули, Zod схеми, hooks, криптография и техните тестове (`camelCase.test.ts`) **ВИНАГИ** използват `camelCase` — както за имената на файловете (`jevRouter.ts`, `documentDal.ts`, `storageDal.ts`, `headerScrubber.ts`), така и за самите функции вътре. Публичният експорт на всеки feature модул е `index.ts`.
+   - Всички спомагателни функции, агенти, рутери, DAL модули, Zod схеми, hooks, криптография и техните тестове (`camelCase.test.ts`) **ВИНАГИ** използват `camelCase` — както за имената на файловете (`jevRouter.ts`, `documentDal.ts`, `storageDal.ts`, `headerScrubber.ts`), така и за самите функции вътре. Публичните входни точки на всеки feature модул са `index.ts` (и `server.ts` само за сървърни DAL модули със `server-only`).
 2. **`PascalCase` и Arrow Functions за React Компоненти (`PascalCase.tsx`):**
    - Всички React компоненти **ВИНАГИ** носят имена в `PascalCase.tsx` (`DocumentViewer.tsx`, `AppShell.tsx`, `PinPadScreen.tsx`).
    - Всеки React компонент **ВИНАГИ** се дефинира като **Arrow Function** (`export const MyComponent: React.FC<Props> = () => { ... }`). Ключовата дума `function` за дефиниране на компоненти е строго забранена.
 3. **Единствени разрешени системни изключения:** Маршрутните файлове на Next.js 16 в `src/app/` (`page.tsx`, `layout.tsx`, `loading.tsx`, `error.tsx`, `not-found.tsx`, `route.ts`, `manifest.ts`), `src/proxy.ts` и `.agents/skills/<skill-name>/SKILL.md`.
 4. **Твърд лимит от 250–300 реда на файл:** Нито един файл в `src/` не може да надвишава **300 реда** (проверява се автоматично от `pnpm verify:arch`). При достигане на 250 реда файлът се разделя на малки модули.
-5. **Feature изолация и DAL:** Всеки домейн живее в `src/features/<featureName>/` и се импортира отвън **единствено** през `@/features/<featureName>` (`index.ts`). Всички заявки към Supabase Database и Supabase Storage са изолирани в `dal/` със `server-only`.
+5. **Feature изолация и DAL:** Всеки домейн живее в `src/features/<featureName>/` и се импортира отвън **единствено** през `@/features/<featureName>` (`index.ts`) или `@/features/<featureName>/server` (`server.ts` само за сървърни DAL модули). Всички заявки към Supabase Database и Supabase Storage са изолирани в `dal/` със `server-only`.
 6. **Семантичен HTML, A11y & Tailwind v4:** Използвай `<main>`, `<nav>`, `<section>`, `<article>`, `<header>`, `<aside>`, задължителен `aria-label` на интерактивни елементи, уникални `Metadata` на всяка страница и новия градиентен синтаксис `bg-linear-to-*` (`bg-gradient-to-*` е забранен).
 
 ---

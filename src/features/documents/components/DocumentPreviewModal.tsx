@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
-import { Download, FileText, Loader2, Save, X } from 'lucide-react';
+import { Loader2, Save, X } from 'lucide-react';
 import {
   getDialogFocusableElements,
   useDialogFocusTrap,
@@ -18,6 +18,7 @@ import {
   type DocumentType,
   type UpdateDocumentMetaInput,
 } from '../schemas/documentSchema';
+import { DocumentFallbackViewer } from './DocumentFallbackViewer';
 
 interface DocumentPreviewModalProps {
   readonly doc: CatalogDocumentItem;
@@ -25,6 +26,9 @@ interface DocumentPreviewModalProps {
   readonly onClose: () => void;
   readonly onSaveMeta: (input: UpdateDocumentMetaInput) => Promise<void>;
 }
+
+const INPUT_CLASS =
+  'w-full rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2 text-base md:text-xs text-white focus:border-cyan-500 focus:outline-none';
 
 export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
   doc,
@@ -128,25 +132,11 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
             />
           )}
           {signedUrl && !isPdf && !isImage && (
-            <div className="max-w-lg rounded-2xl border border-zinc-800 bg-zinc-950/90 p-6 text-center space-y-4">
-              <FileText className="mx-auto h-12 w-12 text-cyan-400" aria-hidden="true" />
-              <p className="text-sm font-semibold text-white">{doc.originalFileName}</p>
-              {doc.summaryText && (
-                <p className="text-xs text-zinc-300 leading-relaxed text-left whitespace-pre-wrap">
-                  {doc.summaryText}
-                </p>
-              )}
-              <a
-                href={signedUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label={`Свали оригиналния файл ${doc.originalFileName}`}
-                className="inline-flex items-center gap-2 rounded-xl bg-cyan-500/15 border border-cyan-500/30 px-4 py-2 text-xs font-bold text-cyan-300 hover:bg-cyan-500/25"
-              >
-                <Download className="h-4 w-4" aria-hidden="true" />
-                <span>Свали оригиналния файл</span>
-              </a>
-            </div>
+            <DocumentFallbackViewer
+              originalFileName={doc.originalFileName}
+              summaryText={doc.summaryText}
+              signedUrl={signedUrl}
+            />
           )}
         </div>
 
@@ -169,92 +159,49 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
 
           <div>
             <label className="block text-xs font-mono text-zinc-400 mb-1">Заглавие</label>
-            <input
-              type="text"
-              required
-              aria-label="Заглавие на документа"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2 text-base md:text-xs text-white focus:border-cyan-500 focus:outline-none"
-            />
+            <input type="text" required aria-label="Заглавие на документа" value={title} onChange={(e) => setTitle(e.target.value)} className={INPUT_CLASS} />
           </div>
 
           <div className="grid grid-cols-2 gap-2.5">
             <div>
               <label className="block text-xs font-mono text-zinc-400 mb-1">Тема</label>
-              <select
-                aria-label="Тема на документа"
-                value={topic}
-                onChange={(e) => setTopic(e.target.value as DocumentTopic)}
-                className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-2.5 py-2 text-base md:text-xs text-white focus:border-cyan-500 focus:outline-none"
-              >
-                {DOCUMENT_TOPICS.map((t) => (
-                  <option key={t} value={t}>{DOCUMENT_TOPIC_LABELS_BG[t]}</option>
-                ))}
+              <select aria-label="Тема на документа" value={topic} onChange={(e) => setTopic(e.target.value as DocumentTopic)} className={INPUT_CLASS}>
+                {DOCUMENT_TOPICS.map((t) => <option key={t} value={t}>{DOCUMENT_TOPIC_LABELS_BG[t]}</option>)}
               </select>
             </div>
             <div>
               <label className="block text-xs font-mono text-zinc-400 mb-1">Вид</label>
-              <select
-                aria-label="Вид на документа"
-                value={docType}
-                onChange={(e) => setDocType(e.target.value as DocumentType)}
-                className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-2.5 py-2 text-base md:text-xs text-white focus:border-cyan-500 focus:outline-none"
-              >
-                {DOCUMENT_TYPES.map((dt) => (
-                  <option key={dt} value={dt}>{DOCUMENT_TYPE_LABELS_BG[dt]}</option>
-                ))}
+              <select aria-label="Вид на документа" value={docType} onChange={(e) => setDocType(e.target.value as DocumentType)} className={INPUT_CLASS}>
+                {DOCUMENT_TYPES.map((dt) => <option key={dt} value={dt}>{DOCUMENT_TYPE_LABELS_BG[dt]}</option>)}
               </select>
             </div>
           </div>
 
           <div>
             <label className="block text-xs font-mono text-zinc-400 mb-1">Подател</label>
-            <input
-              type="text"
-              aria-label="Подател на документа"
-              value={sender}
-              onChange={(e) => setSender(e.target.value)}
-              className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2 text-base md:text-xs text-white focus:border-cyan-500 focus:outline-none"
-            />
+            <input type="text" aria-label="Подател на документа" value={sender} onChange={(e) => setSender(e.target.value)} className={INPUT_CLASS} />
           </div>
 
           <div className="grid grid-cols-2 gap-2.5">
             <div>
               <label className="block text-xs font-mono text-zinc-400 mb-1">Дата</label>
-              <input
-                type="date"
-                aria-label="Дата от документа"
-                value={docDate}
-                onChange={(e) => setDocDate(e.target.value)}
-                className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-2.5 py-2 text-base md:text-xs text-white focus:border-cyan-500 focus:outline-none"
-              />
+              <input type="date" aria-label="Дата от документа" value={docDate} onChange={(e) => setDocDate(e.target.value)} className={INPUT_CLASS} />
             </div>
             <div>
               <label className="block text-xs font-mono text-zinc-400 mb-1">Краен срок</label>
-              <input
-                type="date"
-                aria-label="Краен срок по документа"
-                value={expiresAt}
-                onChange={(e) => setExpiresAt(e.target.value)}
-                className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-2.5 py-2 text-base md:text-xs text-white focus:border-cyan-500 focus:outline-none"
-              />
+              <input type="date" aria-label="Краен срок по документа" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} className={INPUT_CLASS} />
             </div>
           </div>
 
           {doc.summaryText && (
             <div className="rounded-xl border border-zinc-800 bg-zinc-900/70 p-3">
-              <span className="block text-[11px] font-mono font-semibold text-cyan-300 mb-1">
-                Извлечено Резюме:
-              </span>
+              <span className="block text-[11px] font-mono font-semibold text-cyan-300 mb-1">Извлечено Резюме:</span>
               <p className="text-xs text-zinc-300 leading-relaxed">{doc.summaryText}</p>
             </div>
           )}
 
           {saveError && (
-            <p role="alert" className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-3.5 py-2.5 text-xs text-rose-300">
-              {saveError}
-            </p>
+            <p role="alert" className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-3.5 py-2.5 text-xs text-rose-300">{saveError}</p>
           )}
 
           <button
@@ -278,8 +225,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
             closeButtonRef.current.focus();
             return;
           }
-          const focusables = getDialogFocusableElements(dialogRef.current);
-          focusables[0]?.focus();
+          getDialogFocusableElements(dialogRef.current)[0]?.focus();
         }}
       />
     </div>

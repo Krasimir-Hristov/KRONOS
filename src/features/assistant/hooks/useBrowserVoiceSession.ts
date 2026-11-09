@@ -64,6 +64,10 @@ export const useBrowserVoiceSession = ({
   const recognitionRef = useRef<SpeechRecognitionInstanceLike | null>(null);
   const modeRef = useRef<CommunicationMode>(mode);
   modeRef.current = mode;
+  const onAppendDictatedTextRef = useRef(onAppendDictatedText);
+  onAppendDictatedTextRef.current = onAppendDictatedText;
+  const onHandsFreeSendRef = useRef(onHandsFreeSend);
+  onHandsFreeSendRef.current = onHandsFreeSend;
   const lastSpokenMessageIdRef = useRef<string | null>(
     latestAssistantReply?.id ?? null
   );
@@ -117,9 +121,9 @@ export const useBrowserVoiceSession = ({
           if (!cleaned) return;
 
           if (targetMode === 'hands_free') {
-            void onHandsFreeSend(cleaned);
+            void onHandsFreeSendRef.current(cleaned);
           } else {
-            onAppendDictatedText(cleaned);
+            onAppendDictatedTextRef.current(cleaned);
           }
         };
 
@@ -133,7 +137,7 @@ export const useBrowserVoiceSession = ({
         setIsListening(false);
       }
     },
-    [onAppendDictatedText, onHandsFreeSend, stopListening, stopSpeaking]
+    [stopListening, stopSpeaking]
   );
 
   useEffect(() => {

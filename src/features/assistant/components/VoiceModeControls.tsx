@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Headphones, Keyboard, Mic, MicOff, Volume2, VolumeX } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { useBrowserVoiceSession } from '../hooks/useBrowserVoiceSession';
 
 interface VoiceModeControlsProps {
@@ -20,6 +21,7 @@ export const VoiceModeControls: React.FC<VoiceModeControlsProps> = ({
   onAppendDictatedText,
   onHandsFreeSend,
 }) => {
+  const t = useTranslations('chat');
   const voice = useBrowserVoiceSession({
     latestAssistantReply,
     onAppendDictatedText,
@@ -30,13 +32,13 @@ export const VoiceModeControls: React.FC<VoiceModeControlsProps> = ({
     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800/80 pb-2">
       <div
         role="group"
-        aria-label="Режим на общуване с KRONOS"
+        aria-label={t('voiceModeGroupAria')}
         className="inline-flex flex-wrap items-center gap-1 rounded-2xl border border-zinc-800 bg-zinc-900/80 p-1"
       >
         <button
           type="button"
           onClick={() => voice.selectMode('text')}
-          aria-label="Режим писане с клавиатура"
+          aria-label={t('voiceModeTextAria')}
           className={`inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-[11px] font-mono font-semibold transition-all ${
             voice.mode === 'text'
               ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/35'
@@ -44,13 +46,13 @@ export const VoiceModeControls: React.FC<VoiceModeControlsProps> = ({
           }`}
         >
           <Keyboard className="h-3.5 w-3.5" aria-hidden="true" />
-          <span>Текст</span>
+          <span>{t('voiceModeTextLabel')}</span>
         </button>
 
         <button
           type="button"
           onClick={() => voice.selectMode('dictate')}
-          aria-label="Режим гласово диктуване в полето за текст"
+          aria-label={t('voiceModeDictateAria')}
           className={`inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-[11px] font-mono font-semibold transition-all ${
             voice.mode === 'dictate'
               ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/35'
@@ -58,13 +60,13 @@ export const VoiceModeControls: React.FC<VoiceModeControlsProps> = ({
           }`}
         >
           <Mic className="h-3.5 w-3.5" aria-hidden="true" />
-          <span>Диктуване</span>
+          <span>{t('voiceModeDictateLabel')}</span>
         </button>
 
         <button
           type="button"
           onClick={() => voice.selectMode('hands_free')}
-          aria-label="Режим гласов разговор без ръце (Hands-Free)"
+          aria-label={t('voiceModeHandsFreeAria')}
           className={`inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-[11px] font-mono font-semibold transition-all ${
             voice.mode === 'hands_free'
               ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/35'
@@ -72,7 +74,7 @@ export const VoiceModeControls: React.FC<VoiceModeControlsProps> = ({
           }`}
         >
           <Headphones className="h-3.5 w-3.5" aria-hidden="true" />
-          <span>Гласов разговор</span>
+          <span>{t('voiceModeHandsFreeLabel')}</span>
         </button>
       </div>
 
@@ -82,11 +84,11 @@ export const VoiceModeControls: React.FC<VoiceModeControlsProps> = ({
             <button
               type="button"
               onClick={voice.stopSpeaking}
-              aria-label="Спри гласовото четене"
+              aria-label={t('voiceStopSpeakingAria')}
               className="inline-flex items-center gap-1.5 rounded-xl border border-amber-500/40 bg-amber-500/15 px-2.5 py-1 text-[11px] font-mono text-amber-300"
             >
               <VolumeX className="h-3.5 w-3.5" aria-hidden="true" />
-              <span>Спри гласа</span>
+              <span>{t('voiceStopSpeakingLabel')}</span>
             </button>
           )}
 
@@ -98,7 +100,9 @@ export const VoiceModeControls: React.FC<VoiceModeControlsProps> = ({
                 ? voice.stopListening()
                 : voice.startListening(voice.mode)
             }
-            aria-label={voice.isListening ? 'Спри микрофона' : 'Включи микрофона'}
+            aria-label={
+              voice.isListening ? t('voiceStopMicAria') : t('voiceStartMicAria')
+            }
             className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1 text-[11px] font-mono font-bold transition-all ${
               voice.isListening
                 ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse'
@@ -108,12 +112,12 @@ export const VoiceModeControls: React.FC<VoiceModeControlsProps> = ({
             {voice.isListening ? (
               <>
                 <MicOff className="h-3.5 w-3.5" aria-hidden="true" />
-                <span>Слушам... (Спри)</span>
+                <span>{t('voiceListeningLabel')}</span>
               </>
             ) : (
               <>
                 <Volume2 className="h-3.5 w-3.5" aria-hidden="true" />
-                <span>Говори сега</span>
+                <span>{t('voiceSpeakNowLabel')}</span>
               </>
             )}
           </button>

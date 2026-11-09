@@ -23,12 +23,12 @@ describe('deterministicParsers & universalIngestionDal', () => {
     expect(isTextOrOfficeMimeType('image/jpeg')).toBe(false);
   });
 
-  it('parses HTML stripping scripts/styles and preserving block text', () => {
+  it('parses HTML stripping scripts/styles, preserving block text, and ignoring out-of-range numeric entities', () => {
     const html = `
       <html>
         <head><style>body { color: red; }</style><script>alert(1)</script></head>
         <body>
-          <h1>Wohngeld Портал</h1>
+          <h1>Wohngeld Портал &#99999999; &#0;</h1>
           <p>Нужни документи: Kontoausz&uuml;ge &amp; Mietvertrag</p>
         </body>
       </html>
@@ -39,11 +39,12 @@ describe('deterministicParsers & universalIngestionDal', () => {
     expect(text).not.toContain('alert(1)');
   });
 
-  it('parses .docx word/document.xml deterministically via fflate', () => {
+  it('parses .docx word/document.xml deterministically via fflate while ignoring unrelated archive entries', () => {
     const docxBytes = zipSync({
       'word/document.xml': strToU8(
         `<w:document><w:body><w:p><w:r><w:t>Молба за Kinderzuschlag</w:t></w:r></w:p><w:p><w:r><w:t>Steuer-ID: 12 345 678 901</w:t></w:r></w:p></w:body></w:document>`
       ),
+      'word/media/image1.png': strToU8('binary-image-data'),
     });
 
     const text = extractTextDeterministically(
@@ -54,13 +55,13 @@ describe('deterministicParsers & universalIngestionDal', () => {
     expect(text).toBe('Молба за Kinderzuschlag\nSteuer-ID: 12 345 678 901');
   });
 
-  it('parses .xlsx sharedStrings and worksheets deterministically via fflate', () => {
+  it('parses .xlsx sharedStrings and worksheets including self-closing styled cells preceding shared-string cells', () => {
     const xlsxBytes = zipSync({
       'xl/sharedStrings.xml': strToU8(
         `<sst><si><t>Месец</t></si><si><t>Kaltmiete</t></si><si><t>Ноември 2026</t></si></sst>`
       ),
       'xl/worksheets/sheet1.xml': strToU8(
-        `<worksheet><sheetData><row><c t="s"><v>0</v></c><c t="s"><v>1</v></c></row><row><c t="s"><v>2</v></c><c><v>850.00</v></c></row></sheetData></worksheet>`
+        `<worksheet><sheetData><row><c r="A1" s="1"/><c r="B1" t="s"><v>0</v></c><c r="C1" t="s"><v>1</v></c></row><row><c r="A2" s="2"/><c r="B2" t="s"><v>2</v></c><c r="C2"><v>850.00</v></c></row></sheetData></worksheet>`
       ),
     });
 
