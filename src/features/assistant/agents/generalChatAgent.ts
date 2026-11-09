@@ -12,11 +12,12 @@ import {
   type AssistantTurnResult,
   type SubAgentManifest,
 } from '../schemas/assistantSchema';
+import { DEFAULT_DEPARTMENT_CRITERIA } from './jevClient';
 import { isSecretIntentMessage } from './keywordClassifier';
 import { handleSecretsRequest } from './vaultSearchAndManageAgent';
 
-const SAVE_TO_RAG_REGEX =
-  /запази(?:\s+го|\s+това|\s+файла|\s+документа|\s+снимката)?(?:\s+в\s+сейфа)?|добави\s+в\s+сейфа|save\s+to\s+vault|speicher/i;
+export const SAVE_TO_RAG_REGEX =
+  /(?:запази|запиши|добави|качи)(?:\s+(?:го|я|това|файла|документа|снимката))?\s+в\s+(?:rag\s+)?сейфа|(?:запази|запиши)\s+(?:този\s+|тази\s+)?(?:файл(?:а)?|документ(?:а)?|снимка(?:та)?)|\bsave\s+(?:it\s+|this\s+|the\s+(?:file|document|image)\s+)?to\s+(?:the\s+)?(?:rag\s+)?vault\b|\b(?:im\s+tresor\s+speichern|in\s+den\s+tresor\s+speichern|(?:dokument|datei|bild)\s+speichern)\b/i;
 
 export const generalChatResponseSchema = z.object({
   replyBg: z.string().trim().min(1).max(6000),
@@ -210,8 +211,7 @@ export const executeGeneralChatAgent = async (
 export const generalChatAgent: SubAgentManifest = {
   agentId: 'generalChatAgent',
   department: 'general_chat',
-  jevCriteria:
-    'Ежедневен AI модел (Normal AI model) за общи разговори, програмиране, въпроси за прикачени снимки/файлове извън бюрокрация и запис на информация в RAG системата при поискване.',
+  jevCriteria: DEFAULT_DEPARTMENT_CRITERIA.general_chat,
   inputSchema: agentExecutionInputSchema,
   outputSchema: assistantTurnResultSchema,
   execute: (input) => executeGeneralChatAgent(input),

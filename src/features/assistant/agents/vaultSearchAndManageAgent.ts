@@ -11,6 +11,7 @@ import {
 } from '../schemas/assistantSchema';
 import type { LlmTextInvoker } from '@/lib/ai/llmJsonService';
 import type { HandlerOutput, VaultHandlerContext } from './agentTypes';
+import { DEFAULT_DEPARTMENT_CRITERIA } from './jevClient';
 import { isSecretIntentMessage } from './keywordClassifier';
 import {
   handleDeleteDocuments,
@@ -258,8 +259,7 @@ export const executeVaultAgent = async (
 export const vaultSearchAndManageAgent: SubAgentManifest = {
   agentId: 'vaultSearchAndManageAgent',
   department: 'vault_search_and_manage',
-  jevCriteria:
-    'Търсене, намиране, качване, промяна и изтриване на документи в сейфа; лични факти (Steuer-ID, IBAN, Kaltmiete); пароли и тайни.',
+  jevCriteria: DEFAULT_DEPARTMENT_CRITERIA.vault_search_and_manage,
   inputSchema: agentExecutionInputSchema,
   outputSchema: assistantTurnResultSchema,
   execute: (input) => executeVaultAgent(input),

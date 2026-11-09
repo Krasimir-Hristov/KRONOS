@@ -185,6 +185,8 @@ export interface RecentChatContext {
   readonly agentStatesByDepartment: AgentStatesByDepartment;
 }
 
+const STATE_SNAPSHOT_LOOKBACK_LIMIT = 40;
+
 export const getRecentChatContext = async (
   sessionId: string,
   limit = 6
@@ -192,14 +194,24 @@ export const getRecentChatContext = async (
   try {
     await requireAuthAndPin({ redirectOnFail: false });
     const supabase = await createServerSupabaseClient();
-    const { data, error } = await supabase
-      .from('chat_messages')
-      .select('id, sender_role, content, metadata, created_at')
-      .eq('session_id', sessionId)
-      .in('sender_role', ['user', 'assistant'])
-      .order('created_at', { ascending: false })
-      .order('id', { ascending: false })
-      .limit(limit);
+    const [{ data, error }, { data: assistantRows }] = await Promise.all([
+      supabase
+        .from('chat_messages')
+        .select('id, sender_role, content, created_at')
+        .eq('session_id', sessionId)
+        .in('sender_role', ['user', 'assistant'])
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .limit(limit),
+      supabase
+        .from('chat_messages')
+        .select('id, metadata, created_at')
+        .eq('session_id', sessionId)
+        .eq('sender_role', 'assistant')
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .limit(STATE_SNAPSHOT_LOOKBACK_LIMIT),
+    ]);
 
     if (error || !data) {
       return { history: [], agentStatesByDepartment: {} };
@@ -209,8 +221,8 @@ export const getRecentChatContext = async (
     const stateMap: Partial<Record<AssistantDepartment, Readonly<Record<string, unknown>>>> =
       {};
 
-    for (const row of chronological) {
-      if (row.sender_role === 'assistant' && row.metadata) {
+    for (const row of [...(assistantRows ?? [])].reverse()) {
+      if (row.metadata) {
         const parsed = assistantTurnPayloadSchema.safeParse(row.metadata);
         if (
           parsed.success &&

@@ -22,6 +22,8 @@ export interface SupervisorIngestionDeps {
   readonly fetchImpl?: typeof fetch;
 }
 
+const MAX_INGESTED_OCR_TEXT_CHARS = 50_000;
+
 /**
  * Single-pass Pre-Jev Ingestion executed by the Supervisor Agent ONLY when an attachment is present.
  * When attachment is null, returns null immediately (0 ms).
@@ -52,7 +54,7 @@ export const ingestAttachmentForSupervisor = async (
       docDate: extracted.docDate,
       expiresAt: extracted.expiresAt,
       summaryText: extracted.summaryText,
-      rawOcrText: extracted.rawOcrText,
+      rawOcrText: extracted.rawOcrText.slice(0, MAX_INGESTED_OCR_TEXT_CHARS),
       suggestedFacts: extracted.suggestedFacts,
     });
 

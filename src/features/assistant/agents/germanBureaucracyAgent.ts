@@ -25,6 +25,7 @@ import {
   selectFactsByLabels,
   toFactCard,
 } from './factCards';
+import { DEFAULT_DEPARTMENT_CRITERIA } from './jevClient';
 import {
   gatherPortalDocuments,
   type PortalDocumentBundle,
@@ -256,8 +257,7 @@ export const executeGermanBureaucracyAgent = async (
 export const germanBureaucracyAgent: SubAgentManifest = {
   agentId: 'germanBureaucracyAgent',
   department: 'german_bureaucracy',
-  jevCriteria:
-    'Помощ за немски онлайн портали (Wohngeld, Kinderzuschlag, Elterngeld, Finanzamt), поставени скрийншоти (Ctrl+V), PDF молби (Antrag), разчитане на писма и срокове (Bescheid) и писане на официални отговори или Widerspruch на немски.',
+  jevCriteria: DEFAULT_DEPARTMENT_CRITERIA.german_bureaucracy,
   inputSchema: agentExecutionInputSchema,
   outputSchema: assistantTurnResultSchema,
   execute: (input) => executeGermanBureaucracyAgent(input),

@@ -1,8 +1,12 @@
-import { describe, expect, it, vi } from 'vitest';
-import { executeGeneralChatAgent } from './generalChatAgent';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { executeGeneralChatAgent, SAVE_TO_RAG_REGEX } from './generalChatAgent';
 import { runKronosSupervisorGraph } from './supervisorGraph';
 
 describe('generalChatAgent & Hierarchical Supervisor Architecture', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it('answers everyday questions and understands pre-ingested images via Supervisor', async () => {
     const mockInvoker = vi.fn().mockResolvedValue(
       JSON.stringify({
@@ -52,7 +56,12 @@ describe('generalChatAgent & Hierarchical Supervisor Architecture', () => {
     });
   });
 
-  it('saves attached file to RAG system when requested in everyday chat', async () => {
+  it('saves attached file to RAG system only on explicit vault/file save commands', async () => {
+    expect(SAVE_TO_RAG_REGEX.test('запази спокойствие')).toBe(false);
+    expect(SAVE_TO_RAG_REGEX.test('Wie viel Speicher hat der Laptop?')).toBe(false);
+    expect(SAVE_TO_RAG_REGEX.test('Запази снимката в сейфа')).toBe(true);
+    expect(SAVE_TO_RAG_REGEX.test('Dokument speichern')).toBe(true);
+
     const mockSave = vi.fn().mockResolvedValue({
       documentId: '99999999-9999-4999-8999-999999999999',
       title: 'Бележка за гаранция',
@@ -94,7 +103,7 @@ describe('generalChatAgent & Hierarchical Supervisor Architecture', () => {
   });
 
   it('runs single-pass Pre-Jev Ingestion in Supervisor and slices previousAgentState per subagent', async () => {
-    process.env.OPENROUTER_API_KEY = 'test-or-key';
+    vi.stubEnv('OPENROUTER_API_KEY', 'test-or-key');
 
     const buildVisionSourceSpy = vi.fn().mockResolvedValue({
       fileName: 'photo.jpg',

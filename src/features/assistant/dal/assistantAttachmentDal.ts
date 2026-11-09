@@ -119,12 +119,18 @@ export const cleanupTemporaryAttachment = async (storagePath: string): Promise<v
   try {
     const userId = await assertOwnedPath(storagePath);
     const supabase = await createServerSupabaseClient();
-    const { data: linked } = await supabase
+    const { data: linked, error } = await supabase
       .from('documents')
       .select('id')
       .eq('owner_id', userId)
       .eq('storage_path', storagePath)
       .maybeSingle();
+
+    if (error) {
+      throw new Error('Неуспешна проверка на привързаност за прикачения файл.', {
+        cause: error,
+      });
+    }
 
     if (!linked) {
       await purgeVaultStorageObjects([storagePath]);
