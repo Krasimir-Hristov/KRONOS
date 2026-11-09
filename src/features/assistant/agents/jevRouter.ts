@@ -1,6 +1,7 @@
 import 'server-only';
 import { decideRoutingWithJev } from './jevClient';
 import { classifyByKeywords, isSecretIntentMessage } from './keywordClassifier';
+import { buildAttachmentRoutingDigest } from './supervisorIngestion';
 import {
   routeWithTraditionalSupervisor,
   type SupervisorRouteInput,
@@ -14,8 +15,9 @@ export interface JevRouterDeps {
 }
 
 /**
- * Tier 1: Jev Decisions routing (1.5s timeout). Any failure falls through to the
- * Tier 2 traditional OpenRouter supervisor (which itself degrades to Tier 3 keywords).
+ * Tier 1: Jev Decisions routing (1.5s timeout) receiving both the user message and the
+ * Supervisor's pre-ingested attachment digest. Any failure falls through to the Tier 2
+ * traditional OpenRouter supervisor (which itself degrades to Tier 3 keywords).
  * Messages that look like they contain secrets never leave the server: they are routed locally.
  */
 export const routeWithJev = async (
@@ -26,15 +28,21 @@ export const routeWithJev = async (
     const decision = classifyByKeywords({
       message: input.message,
       attachment: input.attachment,
+      ingestedAttachment: input.ingestedAttachment,
     });
     return { ...decision, tier: 'local' };
   }
+
+  const attachmentDigest =
+    input.attachmentDigest ??
+    buildAttachmentRoutingDigest(input.ingestedAttachment ?? null, input.attachment);
 
   try {
     const decision = await decideRoutingWithJev(
       {
         message: input.message,
         hasAttachment: input.attachment !== null,
+        attachmentDigest,
         departmentCriteria: input.departmentCriteria,
         nowIso: input.nowIso,
       },
@@ -42,6 +50,9 @@ export const routeWithJev = async (
     );
     return { ...decision, tier: 'jev' };
   } catch {
-    return routeWithTraditionalSupervisor(input, deps.invoker);
+    return routeWithTraditionalSupervisor(
+      { ...input, attachmentDigest },
+      deps.invoker
+    );
   }
 };

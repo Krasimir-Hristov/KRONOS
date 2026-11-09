@@ -8,7 +8,10 @@ import {
   DOCUMENT_TYPES,
   FACT_CATEGORIES,
 } from '@/lib/ai/documentOcrService';
-import type { AssistantIntent } from '../schemas/assistantSchema';
+import type {
+  AssistantIntent,
+  IngestedAttachmentContext,
+} from '../schemas/assistantSchema';
 
 export const VAULT_ACTIONS = [
   'search_documents',
@@ -105,6 +108,8 @@ export interface PlanVaultActionInput {
   readonly message: string;
   readonly intent: AssistantIntent;
   readonly hasAttachment: boolean;
+  readonly ingestedAttachment?: IngestedAttachmentContext | null;
+  readonly previousAgentState?: Readonly<Record<string, unknown>> | null;
   readonly nowIso: string;
   readonly history: readonly { readonly role: 'user' | 'assistant'; readonly content: string }[];
 }
@@ -180,6 +185,15 @@ export const planVaultAction = async (
         today: input.nowIso.slice(0, 10),
         intentHint: input.intent,
         hasAttachment: input.hasAttachment,
+        ingestedAttachment: input.ingestedAttachment
+          ? {
+              title: input.ingestedAttachment.title,
+              topic: input.ingestedAttachment.topic,
+              docType: input.ingestedAttachment.docType,
+              summaryText: input.ingestedAttachment.summaryText,
+            }
+          : null,
+        previousAgentState: input.previousAgentState ?? null,
         recentMessages: input.history.slice(-4),
         message: input.message,
       }),

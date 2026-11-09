@@ -43,6 +43,9 @@ export const routingDecisionSchema = z
     if (BUREAUCRACY_ONLY_INTENTS.has(val.intent)) {
       return { department: 'german_bureaucracy' as const, intent: val.intent };
     }
+    if (val.intent === 'general_chat') {
+      return { department: 'general_chat' as const, intent: 'general_chat' as const };
+    }
     return val;
   });
 

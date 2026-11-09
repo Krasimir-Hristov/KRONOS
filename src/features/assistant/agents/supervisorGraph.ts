@@ -11,20 +11,35 @@ import {
   type AssistantTier,
   type AssistantTurnResult,
   type ChatAttachmentInput,
+  type IngestedAttachmentContext,
   type SubAgentManifest,
 } from '../schemas/assistantSchema';
+import { generalChatAgent } from './generalChatAgent';
 import { germanBureaucracyAgent } from './germanBureaucracyAgent';
 import { routeWithJev, type JevRouterDeps } from './jevRouter';
+import {
+  buildAttachmentRoutingDigest,
+  ingestAttachmentForSupervisor,
+  type SupervisorIngestionDeps,
+} from './supervisorIngestion';
 import { vaultSearchAndManageAgent } from './vaultSearchAndManageAgent';
 
+export type AgentStatesByDepartment = Readonly<
+  Partial<Record<AssistantDepartment, Readonly<Record<string, unknown>>>>
+>;
+
 export const SUBAGENT_REGISTRY: Readonly<Record<AssistantDepartment, SubAgentManifest>> = {
+  general_chat: generalChatAgent,
   vault_search_and_manage: vaultSearchAndManageAgent,
   german_bureaucracy: germanBureaucracyAgent,
 };
 
-export const getDepartmentCriteriaMap = (): Readonly<Record<AssistantDepartment, string>> => ({
-  vault_search_and_manage: SUBAGENT_REGISTRY.vault_search_and_manage.jevCriteria,
-  german_bureaucracy: SUBAGENT_REGISTRY.german_bureaucracy.jevCriteria,
+export const getDepartmentCriteriaMap = (
+  registry: Readonly<Record<AssistantDepartment, SubAgentManifest>> = SUBAGENT_REGISTRY
+): Readonly<Record<AssistantDepartment, string>> => ({
+  general_chat: registry.general_chat.jevCriteria,
+  vault_search_and_manage: registry.vault_search_and_manage.jevCriteria,
+  german_bureaucracy: registry.german_bureaucracy.jevCriteria,
 });
 
 const SupervisorGraphAnnotation = Annotation.Root({
@@ -34,6 +49,18 @@ const SupervisorGraphAnnotation = Annotation.Root({
     default: () => '',
   }),
   attachment: Annotation<ChatAttachmentInput | null>({
+    reducer: (_, next) => next,
+    default: () => null,
+  }),
+  ingestedAttachment: Annotation<IngestedAttachmentContext | null>({
+    reducer: (_, next) => next,
+    default: () => null,
+  }),
+  agentStatesByDepartment: Annotation<AgentStatesByDepartment>({
+    reducer: (prev, next) => ({ ...prev, ...next }),
+    default: () => ({}),
+  }),
+  activeAgentPrevState: Annotation<Readonly<Record<string, unknown>> | null>({
     reducer: (_, next) => next,
     default: () => null,
   }),
@@ -64,43 +91,69 @@ type SupervisorGraphState = typeof SupervisorGraphAnnotation.State;
 export interface RunKronosSupervisorInput {
   readonly message: string;
   readonly attachment: ChatAttachmentInput | null;
+  readonly ingestedAttachment?: IngestedAttachmentContext | null;
+  readonly agentStatesByDepartment?: AgentStatesByDepartment;
   readonly history: readonly { readonly role: 'user' | 'assistant'; readonly content: string }[];
   readonly nowIso?: string;
 }
 
-export interface SupervisorGraphDeps extends JevRouterDeps {
-  readonly registry?: Readonly<Record<AssistantDepartment, SubAgentManifest>>;
+export interface SupervisorGraphDeps extends JevRouterDeps, SupervisorIngestionDeps {
+  readonly registry?: Readonly<Partial<Record<AssistantDepartment, SubAgentManifest>>>;
 }
 
 export const runKronosSupervisorGraph = async (
   input: RunKronosSupervisorInput,
   deps: SupervisorGraphDeps = {}
 ): Promise<AssistantTurnResult> => {
-  const registry = deps.registry ?? SUBAGENT_REGISTRY;
+  const registry: Readonly<Record<AssistantDepartment, SubAgentManifest>> = {
+    ...SUBAGENT_REGISTRY,
+    ...deps.registry,
+  };
   const nowIso = input.nowIso ?? new Date().toISOString();
 
+  /**
+   * Node 1: Supervisor Gatekeeper
+   * - Performs single-pass Pre-Jev Ingestion ONLY if an attachment is present.
+   * - Invokes Jev Router (with backup fallback) using the message + ingested attachment digest.
+   * - Slices conversation memory for the target subagent (`activeAgentPrevState`).
+   */
   const supervisorNode = async (state: SupervisorGraphState) => {
+    const ingested =
+      state.ingestedAttachment ??
+      (state.attachment
+        ? await ingestAttachmentForSupervisor(state.attachment, deps)
+        : null);
+
+    const attachmentDigest = buildAttachmentRoutingDigest(ingested, state.attachment);
+
     const routed = await routeWithJev(
       {
         message: state.userMessage,
         attachment: state.attachment,
+        ingestedAttachment: ingested,
+        attachmentDigest,
         nowIso: state.nowIso,
-        departmentCriteria: {
-          vault_search_and_manage: registry.vault_search_and_manage.jevCriteria,
-          german_bureaucracy: registry.german_bureaucracy.jevCriteria,
-        },
+        departmentCriteria: getDepartmentCriteriaMap(registry),
       },
       deps
     );
 
+    const prevState = state.agentStatesByDepartment[routed.department] ?? null;
+
     return {
+      ingestedAttachment: ingested,
       routedDepartment: routed.department,
       routedIntent: routed.intent,
       routedTier: routed.tier,
+      activeAgentPrevState: prevState,
       stepCount: 1,
     };
   };
 
+  /**
+   * Node 2: Specialized Sub-Agent Execution
+   * Receives the pre-ingested attachment and its own previous structured state snapshot.
+   */
   const buildSubagentNode = (department: AssistantDepartment) => {
     return async (state: SupervisorGraphState) => {
       const manifest = registry[department];
@@ -109,35 +162,66 @@ export const runKronosSupervisorGraph = async (
         intent: state.routedIntent,
         tier: state.routedTier,
         attachment: state.attachment,
+        ingestedAttachment: state.ingestedAttachment,
+        previousAgentState: state.activeAgentPrevState,
         history: [...state.history],
         nowIso: state.nowIso,
       });
 
       return {
-        messages: [new AIMessage(result.replyText)],
-        zone1DocumentIds: [...result.zone1DocumentIds],
-        zone2DocumentIds: [...result.zone2DocumentIds],
         turnResult: result,
         stepCount: 1,
       };
     };
   };
 
+  /**
+   * Node 3: Supervisor Final Responder & Memory Recorder
+   * Collects the subagent's structured envelope, records its state snapshot in central memory,
+   * and emits the final response back to the user.
+   */
+  const supervisorFinalizeNode = async (state: SupervisorGraphState) => {
+    if (!state.turnResult) {
+      return { stepCount: 1 };
+    }
+    const validated = assistantTurnResultSchema.parse(state.turnResult);
+    const dept = (validated.payload.department ??
+      state.routedDepartment) as AssistantDepartment;
+    const nextSnapshot = validated.payload.agentStateSnapshot;
+
+    return {
+      messages: [new AIMessage(validated.replyText)],
+      zone1DocumentIds: [...validated.zone1DocumentIds],
+      zone2DocumentIds: [...validated.zone2DocumentIds],
+      agentStatesByDepartment: nextSnapshot ? { [dept]: nextSnapshot } : {},
+      turnResult: validated,
+      stepCount: 1,
+    };
+  };
+
   const workflow = new StateGraph(SupervisorGraphAnnotation)
     .addNode('supervisor', supervisorNode)
+    .addNode('general_chat', buildSubagentNode('general_chat'))
     .addNode('vault_search_and_manage', buildSubagentNode('vault_search_and_manage'))
     .addNode('german_bureaucracy', buildSubagentNode('german_bureaucracy'))
+    .addNode('supervisor_finalize', supervisorFinalizeNode)
     .addEdge(START, 'supervisor')
     .addConditionalEdges('supervisor', (state: SupervisorGraphState) => {
       if (state.stepCount >= LANGGRAPH_MAX_STEPS) {
         return END;
       }
-      return state.routedDepartment === 'german_bureaucracy'
-        ? 'german_bureaucracy'
-        : 'vault_search_and_manage';
+      if (state.routedDepartment === 'german_bureaucracy') {
+        return 'german_bureaucracy';
+      }
+      if (state.routedDepartment === 'general_chat') {
+        return 'general_chat';
+      }
+      return 'vault_search_and_manage';
     })
-    .addEdge('vault_search_and_manage', END)
-    .addEdge('german_bureaucracy', END);
+    .addEdge('general_chat', 'supervisor_finalize')
+    .addEdge('vault_search_and_manage', 'supervisor_finalize')
+    .addEdge('german_bureaucracy', 'supervisor_finalize')
+    .addEdge('supervisor_finalize', END);
 
   const compiled = workflow.compile();
   const finalState = await compiled.invoke(
@@ -145,10 +229,12 @@ export const runKronosSupervisorGraph = async (
       messages: [new HumanMessage(input.message || '[Прикачен файл]')],
       userMessage: input.message,
       attachment: input.attachment,
+      ingestedAttachment: input.ingestedAttachment ?? null,
+      agentStatesByDepartment: input.agentStatesByDepartment ?? {},
       history: input.history,
       nowIso,
     },
-    { recursionLimit: LANGGRAPH_MAX_STEPS + 2 }
+    { recursionLimit: LANGGRAPH_MAX_STEPS + 3 }
   );
 
   if (finalState.turnResult) {

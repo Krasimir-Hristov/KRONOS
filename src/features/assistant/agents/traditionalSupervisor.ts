@@ -6,15 +6,19 @@ import {
   type AssistantDepartment,
   type AssistantTier,
   type ChatAttachmentInput,
+  type IngestedAttachmentContext,
 } from '../schemas/assistantSchema';
 import { routingDecisionSchema, type RoutingDecision } from '../schemas/jevSchema';
+import { normalizeDepartmentCriteria } from './jevClient';
 import { classifyByKeywords } from './keywordClassifier';
 
 export interface SupervisorRouteInput {
   readonly message: string;
   readonly attachment: ChatAttachmentInput | null;
+  readonly ingestedAttachment?: IngestedAttachmentContext | null;
+  readonly attachmentDigest?: string | null;
   readonly nowIso: string;
-  readonly departmentCriteria: Readonly<Record<AssistantDepartment, string>>;
+  readonly departmentCriteria: Readonly<Partial<Record<AssistantDepartment, string>>>;
 }
 
 export interface SupervisorRouteOutcome extends RoutingDecision {
@@ -41,13 +45,15 @@ export const routeWithTraditionalSupervisor = async (
   input: SupervisorRouteInput,
   invoker?: LlmTextInvoker
 ): Promise<SupervisorRouteOutcome> => {
+  const normalizedCriteria = normalizeDepartmentCriteria(input.departmentCriteria);
   try {
     const decision = await callJsonModel({
       schema: routingDecisionSchema,
-      system: buildRouterSystemPrompt(input.departmentCriteria),
+      system: buildRouterSystemPrompt(normalizedCriteria),
       user: JSON.stringify({
         today: input.nowIso.slice(0, 10),
         hasAttachment: input.attachment !== null,
+        attachmentDigest: input.attachmentDigest ?? null,
         message: input.message,
       }),
       timeoutMs: ROUTER_TIMEOUT_MS,
@@ -59,6 +65,7 @@ export const routeWithTraditionalSupervisor = async (
     const decision = classifyByKeywords({
       message: input.message,
       attachment: input.attachment,
+      ingestedAttachment: input.ingestedAttachment,
     });
     return { ...decision, tier: 'offline' };
   }

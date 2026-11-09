@@ -4,7 +4,7 @@ import {
   agentExecutionInputSchema,
   assistantTurnPayloadSchema,
   assistantTurnResultSchema,
-  type AgentExecutionInput,
+  type AgentExecutionRawInput,
   type AssistantTurnResult,
   type ChatAttachmentInput,
   type SubAgentManifest,
@@ -159,13 +159,14 @@ const buildSafeFallbackResult = (replyText: string): AssistantTurnResult => ({
     draft: null,
     actions: [],
     portalDocumentIds: [],
+    agentStateSnapshot: null,
   },
   zone1DocumentIds: [],
   zone2DocumentIds: [],
 });
 
 export const executeVaultAgent = async (
-  rawInput: AgentExecutionInput,
+  rawInput: AgentExecutionRawInput,
   deps: VaultAgentDeps = {}
 ): Promise<AssistantTurnResult> => {
   try {
@@ -177,16 +178,21 @@ export const executeVaultAgent = async (
 
     let output: HandlerOutput;
     let aiAvailable = true;
+    let plannedAction = 'search_documents';
+    let plannedTopic: string | null = null;
 
     try {
       if (input.intent === 'manage_secret' || isSecretIntentMessage(input.message)) {
         output = handleSecretsRequest(input.message);
+        plannedAction = 'manage_secret';
       } else {
         const planned = await planVaultAction(
           {
             message: input.message,
             intent: input.intent,
             hasAttachment: input.attachment !== null,
+            ingestedAttachment: input.ingestedAttachment,
+            previousAgentState: input.previousAgentState,
             nowIso: input.nowIso,
             history: input.history,
           },
@@ -197,6 +203,9 @@ export const executeVaultAgent = async (
         const effectivePlan = input.attachment?.saveToVault
           ? { ...planned.plan, action: 'save_attachment' as const }
           : planned.plan;
+
+        plannedAction = effectivePlan.action;
+        plannedTopic = effectivePlan.topic;
 
         output = await dispatchPlan(
           {
@@ -219,6 +228,11 @@ export const executeVaultAgent = async (
       intent: input.intent,
       tier: input.tier,
       errorCode: aiAvailable ? null : 'AI_UNAVAILABLE',
+      agentStateSnapshot: {
+        lastAction: plannedAction,
+        lastTopic: plannedTopic,
+        lastZone1Ids: output.zone1Ids ?? [],
+      },
       ...output.payload,
     });
     if (!payloadParsed.success) {

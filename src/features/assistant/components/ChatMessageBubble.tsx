@@ -55,7 +55,9 @@ export const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
   const deptLabel =
     payload?.department === 'german_bureaucracy'
       ? '🏛️ Немска Бюрокрация'
-      : '🔎 Сейф & Данни';
+      : payload?.department === 'general_chat'
+        ? '💬 Ежедневен AI Модел'
+        : '🔎 Сейф & Данни';
 
   return (
     <article className="flex justify-start">

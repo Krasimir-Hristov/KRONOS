@@ -6,9 +6,12 @@ import {
   isSecretIntentMessage,
   SECRET_CHAT_PLACEHOLDER,
 } from '../agents/keywordClassifier';
-import type {
-  AssistantTurnPayload,
-  ChatSessionSummary,
+import type { AgentStatesByDepartment } from '../agents/supervisorGraph';
+import {
+  assistantTurnPayloadSchema,
+  type AssistantDepartment,
+  type AssistantTurnPayload,
+  type ChatSessionSummary,
 } from '../schemas/assistantSchema';
 
 const DEFAULT_SESSION_TITLE = 'Нов разговор';
@@ -177,33 +180,69 @@ export const appendChatMessage = async (input: AppendChatMessageInput): Promise<
   }
 };
 
-export const getRecentChatHistory = async (
+export interface RecentChatContext {
+  readonly history: readonly { readonly role: 'user' | 'assistant'; readonly content: string }[];
+  readonly agentStatesByDepartment: AgentStatesByDepartment;
+}
+
+export const getRecentChatContext = async (
   sessionId: string,
   limit = 6
-): Promise<readonly { readonly role: 'user' | 'assistant'; readonly content: string }[]> => {
+): Promise<RecentChatContext> => {
   try {
     await requireAuthAndPin({ redirectOnFail: false });
     const supabase = await createServerSupabaseClient();
     const { data, error } = await supabase
       .from('chat_messages')
-      .select('id, sender_role, content, created_at')
+      .select('id, sender_role, content, metadata, created_at')
       .eq('session_id', sessionId)
       .in('sender_role', ['user', 'assistant'])
       .order('created_at', { ascending: false })
       .order('id', { ascending: false })
       .limit(limit);
 
-    if (error) {
-      return [];
+    if (error || !data) {
+      return { history: [], agentStatesByDepartment: {} };
     }
-    return [...(data ?? [])].reverse().map((row) => ({
+
+    const chronological = [...data].reverse();
+    const stateMap: Partial<Record<AssistantDepartment, Readonly<Record<string, unknown>>>> =
+      {};
+
+    for (const row of chronological) {
+      if (row.sender_role === 'assistant' && row.metadata) {
+        const parsed = assistantTurnPayloadSchema.safeParse(row.metadata);
+        if (
+          parsed.success &&
+          parsed.data.department &&
+          parsed.data.agentStateSnapshot
+        ) {
+          stateMap[parsed.data.department] = parsed.data.agentStateSnapshot;
+        }
+      }
+    }
+
+    const history = chronological.map((row) => ({
       role: row.sender_role === 'assistant' ? ('assistant' as const) : ('user' as const),
       content:
         row.sender_role === 'user' && isSecretIntentMessage(row.content)
           ? SECRET_CHAT_PLACEHOLDER
           : row.content,
     }));
+
+    return {
+      history,
+      agentStatesByDepartment: stateMap,
+    };
   } catch {
-    return [];
+    return { history: [], agentStatesByDepartment: {} };
   }
+};
+
+export const getRecentChatHistory = async (
+  sessionId: string,
+  limit = 6
+): Promise<readonly { readonly role: 'user' | 'assistant'; readonly content: string }[]> => {
+  const ctx = await getRecentChatContext(sessionId, limit);
+  return ctx.history;
 };

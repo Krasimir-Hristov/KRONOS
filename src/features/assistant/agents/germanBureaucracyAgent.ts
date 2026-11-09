@@ -9,7 +9,7 @@ import {
   agentExecutionInputSchema,
   assistantTurnPayloadSchema,
   assistantTurnResultSchema,
-  type AgentExecutionInput,
+  type AgentExecutionRawInput,
   type AssistantActionCard,
   type AssistantTurnResult,
   type FactCard,
@@ -79,7 +79,7 @@ const collectRelevantFactCards = (
 };
 
 export const executeGermanBureaucracyAgent = async (
-  rawInput: AgentExecutionInput,
+  rawInput: AgentExecutionRawInput,
   deps: GermanBureaucracyAgentDeps = {}
 ): Promise<AssistantTurnResult> => {
   const input = agentExecutionInputSchema.parse(rawInput);
@@ -119,7 +119,10 @@ export const executeGermanBureaucracyAgent = async (
   }
 
   try {
-    const visionSource = input.attachment ? await buildSource(input.attachment) : null;
+    const visionSource =
+      input.attachment && !input.ingestedAttachment
+        ? await buildSource(input.attachment)
+        : null;
     const analysis = await analyzeBureaucracyRequest(
       {
         message: input.message,
@@ -128,6 +131,8 @@ export const executeGermanBureaucracyAgent = async (
         availableFactLabels: allFacts.map((f) => f.label),
         history: input.history,
         source: visionSource,
+        ingestedAttachment: input.ingestedAttachment,
+        previousAgentState: input.previousAgentState,
       },
       deps
     );
@@ -179,6 +184,13 @@ export const executeGermanBureaucracyAgent = async (
       draft: analysis.draft,
       actions,
       portalDocumentIds: bundle.documentIds,
+      agentStateSnapshot: {
+        lastIntent: input.intent,
+        deadline: analysis.guide?.deadline ?? null,
+        draftSubject: analysis.draft?.subjectLine ?? null,
+        neededFactLabels: analysis.guide?.neededFactLabels ?? [],
+        portalDocCount: bundle.documentIds.length,
+      },
     });
 
     return assistantTurnResultSchema.parse({
@@ -229,6 +241,7 @@ export const executeGermanBureaucracyAgent = async (
       draft: null,
       actions,
       portalDocumentIds: fallbackDocIds,
+      agentStateSnapshot: null,
     });
 
     return assistantTurnResultSchema.parse({

@@ -18,6 +18,15 @@ export interface JevQuestion {
   readonly criteria: Readonly<Record<string, string>> | readonly string[];
 }
 
+export const DEFAULT_DEPARTMENT_CRITERIA: Readonly<Record<AssistantDepartment, string>> = {
+  general_chat:
+    'Ежедневен AI модел (Normal AI model) за общи разговори, програмиране, въпроси за прикачени снимки/файлове извън бюрокрация и запис на информация в RAG системата при поискване.',
+  vault_search_and_manage:
+    'Търсене, намиране, качване, промяна и изтриване на документи в сейфа; лични факти (Steuer-ID, IBAN, Kaltmiete); пароли и тайни.',
+  german_bureaucracy:
+    'Помощ за немски онлайн портали (Wohngeld, Kinderzuschlag, Elterngeld, Finanzamt), поставени скрийншоти (Ctrl+V), PDF молби (Antrag), разчитане на писма и срокове (Bescheid) и писане на официални отговори или Widerspruch на немски.',
+};
+
 export const INTENT_CRITERIA: Readonly<Record<AssistantIntent, string>> = {
   search_documents: 'Търсене/намиране на документ, писмо или файл в сейфа (напр. „дойде ми нещо за Kinderzuschlag“).',
   save_or_update_document: 'Запазване на прикачен документ в сейфа или промяна на заглавие/тема/дата на документ.',
@@ -27,7 +36,7 @@ export const INTENT_CRITERIA: Readonly<Record<AssistantIntent, string>> = {
   portal_assist: 'Помощ за немски онлайн портал или формуляр (Wohngeld, Kinderzuschlag) — скрийншот, въпроси, нужни документи.',
   letter_or_form: 'Разчитане на писмо от служба, срок, или попълване на PDF молба (Antrag, Bescheid).',
   draft_reply: 'Съставяне на официален отговор или Widerspruch на немски.',
-  general_chat: 'Общ въпрос, който не изисква достъп до документи или данни.',
+  general_chat: 'Ежедневен разговор, общ въпрос, програмиране или обяснение на снимка/файл извън немска бюрокрация.',
 };
 
 const buildJevHeaders = (apiKey: string): Record<string, string> => ({
@@ -74,25 +83,39 @@ export const callJevDecisions = async (
 export interface JevRoutingInput {
   readonly message: string;
   readonly hasAttachment: boolean;
-  readonly departmentCriteria: Readonly<Record<AssistantDepartment, string>>;
+  readonly attachmentDigest?: string | null;
+  readonly departmentCriteria: Readonly<Partial<Record<AssistantDepartment, string>>>;
   readonly nowIso: string;
 }
+
+export const normalizeDepartmentCriteria = (
+  partial: Readonly<Partial<Record<AssistantDepartment, string>>>
+): Readonly<Record<AssistantDepartment, string>> => ({
+  general_chat: partial.general_chat ?? DEFAULT_DEPARTMENT_CRITERIA.general_chat,
+  vault_search_and_manage:
+    partial.vault_search_and_manage ?? DEFAULT_DEPARTMENT_CRITERIA.vault_search_and_manage,
+  german_bureaucracy:
+    partial.german_bureaucracy ?? DEFAULT_DEPARTMENT_CRITERIA.german_bureaucracy,
+});
 
 export const decideRoutingWithJev = async (
   input: JevRoutingInput,
   fetchImpl: typeof fetch = globalThis.fetch
 ): Promise<RoutingDecision> => {
+  const normalizedCriteria = normalizeDepartmentCriteria(input.departmentCriteria);
   const result = await callJevDecisions(
     {
       today: input.nowIso.slice(0, 10),
       userMessage: input.message,
       hasAttachment: input.hasAttachment,
+      attachmentDigest: input.attachmentDigest ?? null,
     },
     {
       department: {
         type: 'choice',
-        instructions: 'Кой специализиран субагент трябва да обработи съобщението на потребителя?',
-        criteria: input.departmentCriteria,
+        instructions:
+          'Кой поток/субагент трябва да обработи заявката на потребителя според текста и резюмето на прикачения файл?',
+        criteria: normalizedCriteria,
       },
       intent: {
         type: 'choice',

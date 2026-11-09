@@ -3,6 +3,7 @@ import { ALLOWED_MIME_TYPES, MAX_FILE_SIZE_BYTES } from '@/features/storage';
 import { vaultCategorySchema } from '@/features/vault';
 
 export const ASSISTANT_DEPARTMENTS = [
+  'general_chat',
   'vault_search_and_manage',
   'german_bureaucracy',
 ] as const;
@@ -41,6 +42,32 @@ export const chatAttachmentInputSchema = z.object({
 });
 
 export type ChatAttachmentInput = z.infer<typeof chatAttachmentInputSchema>;
+
+export const ingestedAttachmentSchema = z.object({
+  fileName: z.string().trim().min(1).max(255),
+  mimeType: z.string().trim().min(1).max(120),
+  title: z.string().trim().min(1).max(200),
+  topic: z.string().trim().max(60).default('allgemein'),
+  docType: z.string().trim().max(60).default('sonstiges'),
+  sender: z.string().trim().max(160).default(''),
+  docDate: z.string().nullable().default(null),
+  expiresAt: z.string().nullable().default(null),
+  summaryText: z.string().trim().max(2500).default(''),
+  rawOcrText: z.string().max(50000).default(''),
+  suggestedFacts: z
+    .array(
+      z.object({
+        label: z.string().trim().min(1).max(120),
+        value: z.string().trim().min(1).max(500),
+        category: vaultCategorySchema.catch('other'),
+        hint: z.string().trim().max(240).nullable().optional(),
+      })
+    )
+    .max(25)
+    .default([]),
+});
+
+export type IngestedAttachmentContext = z.infer<typeof ingestedAttachmentSchema>;
 
 export const sendChatMessageInputSchema = z
   .object({
@@ -129,6 +156,7 @@ export const assistantTurnPayloadSchema = z.object({
   draft: draftReplySchema.nullable().default(null),
   actions: z.array(assistantActionCardSchema).default([]),
   portalDocumentIds: z.array(z.string().uuid()).default([]),
+  agentStateSnapshot: z.record(z.string(), z.unknown()).nullable().default(null),
 });
 
 export type AssistantTurnPayload = z.infer<typeof assistantTurnPayloadSchema>;
@@ -150,6 +178,8 @@ export const agentExecutionInputSchema = z.object({
   intent: assistantIntentSchema,
   tier: assistantTierSchema,
   attachment: chatAttachmentInputSchema.nullable(),
+  ingestedAttachment: ingestedAttachmentSchema.nullable().optional().default(null),
+  previousAgentState: z.record(z.string(), z.unknown()).nullable().optional().default(null),
   history: z
     .array(
       z.object({
@@ -162,6 +192,7 @@ export const agentExecutionInputSchema = z.object({
 });
 
 export type AgentExecutionInput = z.infer<typeof agentExecutionInputSchema>;
+export type AgentExecutionRawInput = z.input<typeof agentExecutionInputSchema>;
 
 export interface SubAgentManifest {
   readonly agentId: string;
@@ -169,7 +200,7 @@ export interface SubAgentManifest {
   readonly jevCriteria: string;
   readonly inputSchema: typeof agentExecutionInputSchema;
   readonly outputSchema: typeof assistantTurnResultSchema;
-  readonly execute: (input: AgentExecutionInput) => Promise<AssistantTurnResult>;
+  readonly execute: (input: AgentExecutionRawInput) => Promise<AssistantTurnResult>;
 }
 
 export const confirmDeleteInputSchema = z.object({

@@ -8,6 +8,7 @@ import {
   draftReplySchema,
   portalGuideSchema,
   type AssistantIntent,
+  type IngestedAttachmentContext,
 } from '../schemas/assistantSchema';
 
 export const bureaucracyAnalysisSchema = z.object({
@@ -19,7 +20,7 @@ export const bureaucracyAnalysisSchema = z.object({
 export type BureaucracyAnalysis = z.infer<typeof bureaucracyAnalysisSchema>;
 
 const BUREAUCRACY_SYSTEM_PROMPT = `Ти си експерт по немска бюрокрация (Wohngeld, Kinderzuschlag, Elterngeld, Finanzamt, Jobcenter, Familienkasse) и личен помощник в системата KRONOS. Потребителят живее в Германия и говори български.
-Получаваш съобщение, и по желание скрийншот от онлайн портал, PDF формуляр или писмо от служба. Върни САМО валиден JSON:
+Получаваш съобщение, и по желание вече прочетен от Supervisor-а документ ("ingestedAttachment") или скрийншот/PDF формуляр. Върни САМО валиден JSON:
 {
   "replyBg": "Обяснение на прост български: какво се иска от потребителя, какъв е срокът и какво да направи сега (кратко, структурирано).",
   "guide": {
@@ -32,7 +33,7 @@ const BUREAUCRACY_SYSTEM_PROMPT = `Ти си експерт по немска б
   "draft": { "subjectLine": "Betreff на немски", "germanText": "Пълен официален текст на безупречен немски (Sehr geehrte Damen und Herren … Mit freundlichen Grüßen)", "bulgarianExplanation": "Кратко обяснение на български какво пише в отговора и какво трябва да се провери преди изпращане." } или null
 }
 Правила:
-- "draft" попълвай ТОЛКОВА, когато потребителят иска отговор, Widerspruch, писмо или молба; иначе null.
+- "draft" попълвай ТОГАВА, когато потребителят иска отговор, Widerspruch, писмо или молба; иначе null.
 - За лични данни, които не са видими в писмото (име, адрес, Aktenzeichen, IBAN), използвай запълващи полета в квадратни скоби, напр. [Ваше име], [Aktenzeichen]. НИКОГА не измисляй стойности.
 - В "neededFactLabels" слагай само ЕТИКЕТИ — не стойности.
 - Никога не искай и не повтаряй пароли, ПИН или TAN кодове.
@@ -45,6 +46,8 @@ export interface BureaucracyAnalysisInput {
   readonly availableFactLabels: readonly string[];
   readonly history: readonly { readonly role: 'user' | 'assistant'; readonly content: string }[];
   readonly source: OcrDocumentInput | null;
+  readonly ingestedAttachment?: IngestedAttachmentContext | null;
+  readonly previousAgentState?: Readonly<Record<string, unknown>> | null;
 }
 
 export interface BureaucracyAnalysisDeps {
@@ -61,12 +64,26 @@ export const analyzeBureaucracyRequest = async (
     intent: input.intent,
     draftRequired: input.intent === 'draft_reply',
     savedFactLabels: input.availableFactLabels,
+    previousAgentState: input.previousAgentState ?? null,
+    ingestedAttachment: input.ingestedAttachment
+      ? {
+          fileName: input.ingestedAttachment.fileName,
+          title: input.ingestedAttachment.title,
+          topic: input.ingestedAttachment.topic,
+          docType: input.ingestedAttachment.docType,
+          sender: input.ingestedAttachment.sender,
+          docDate: input.ingestedAttachment.docDate,
+          expiresAt: input.ingestedAttachment.expiresAt,
+          summaryText: input.ingestedAttachment.summaryText,
+          rawOcrText: input.ingestedAttachment.rawOcrText.slice(0, 8000),
+        }
+      : null,
     recentMessages: input.history.slice(-4),
     message: input.message || 'Анализирай прикачения файл.',
   });
   const model = getAiModelsConfig().chatPro;
 
-  if (input.source) {
+  if (input.source && !input.ingestedAttachment) {
     return callVisionJson({
       schema: bureaucracyAnalysisSchema,
       system: BUREAUCRACY_SYSTEM_PROMPT,

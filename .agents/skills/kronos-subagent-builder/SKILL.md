@@ -7,12 +7,23 @@ description: >-
   on jevRouter.ts, traditionalSupervisor.ts, or any *Agent.ts file.
 ---
 
-# KRONOS Plug-and-Play Subagent Standard
+# KRONOS Hierarchical Supervisor & Plug-and-Play Subagent Standard
 
-KRONOS uses **OpenRouter exclusively** orchestrated by **LangChain + LangGraph** (`@langchain/core`, `@langchain/langgraph`, `@langchain/openai`) with 3-tier resilience:
-1. **Tier 1 (`jevRouter.ts`)**: Calls `POST https://openrouter.ai/api/alpha/decisions` (`typesafe/jev-*`) with `AbortSignal.timeout(1500)` using `noul`, `choice`, and `score` primitives.
-2. **Tier 2 (`traditionalSupervisor.ts`)**: Automatic fallback in `catch` using classic tool-calling (`bindTools`) on OpenRouter if Jev times out or errors.
-3. **Tier 3 (Graceful Degradation)**: If OpenRouter itself is unreachable, return `{ ok: false, errorCode: 'AI_UNAVAILABLE' }` so the UI shows a clean notice while manual SQL/FTS search in `/documents`, Supabase Storage viewing/ZIP downloads, and manual `/vault` management stay 100% operational.
+KRONOS uses a **Hierarchical LangGraph Supervisor** (`supervisorGraph.ts`) orchestrated via **OpenRouter exclusively** (`@langchain/core`, `@langchain/langgraph`, `@langchain/openai`):
+
+1. **Level 1 — `Supervisor Agent` (`supervisorGraph.ts` + `supervisorIngestion.ts`)**:
+   - Single entry and exit point for the user.
+   - **Pre-Jev Ingestion**: If the user attaches a file (`attachment !== null`), the Supervisor reads/analyzes it **once** before calling `Jev` (producing `ingestedAttachment`). If `attachment === null`, ingestion is skipped in `0 ms`.
+   - **Centralized Memory & Context Slicing**: Only the Supervisor owns the conversation history in `SQL DB` (`chat_sessions` / `chat_messages`). When invoking a subagent, the Supervisor passes a focused context slice: `history` (last few turns) + `previousAgentState` (the last structured snapshot returned by that same subagent in the current conversation) + `ingestedAttachment`.
+2. **Level 2 — `Jev Router` (`jevRouter.ts`) with 3-Tier Resilience**:
+   - **Tier 1 (`jevRouter.ts`)**: Calls `POST https://openrouter.ai/api/alpha/decisions` (`typesafe/jev-*`) with `AbortSignal.timeout(1500)` using the user's message **and** `ingestedAttachment` summary.
+   - **Tier 2 (`traditionalSupervisor.ts`)**: Automatic fallback in `catch` on OpenRouter if Jev times out or errors.
+   - **Tier 3 (`keywordClassifier.ts` & Graceful Degradation)**: If OpenRouter itself is unreachable, routes deterministically and returns `{ errorCode: 'AI_UNAVAILABLE' }` when needed while keeping SQL/FTS search, Storage, and Vault 100% operational.
+3. **Level 3 — Sub-Agents & Their `Sub-Tools`**:
+   - `general_chat` (`generalChatAgent.ts`): Everyday AI model (`chatFast` / DeepSeek) that understands images/files via `ingestedAttachment` and can save documents/facts to `SQL DB` + `Vector DB` (`RAG`).
+   - `vault_search_and_manage` (`vaultSearchAndManageAgent.ts`): Two-Zone RAG Search (Zone 1 with Jev Reranking + Zone 2), personal facts, encrypted secrets, and `100% Hard Purge`.
+   - `german_bureaucracy` (`germanBureaucracyAgent.ts`): German online portals (`Wohngeld`, `Kinderzuschlag`), PDF forms (`Antrag`), deadline extraction (`Bescheid`), and official replies (`Widerspruch`).
+   - **Custom Sub-Agent Flows** (e.g. `finance_manager`, `tipster`, `deep_research`): Each subagent can orchestrate its own internal `sub-tools` and returns a strict **Standard Structured Envelope** (`AssistantTurnResult` + optional `agentStateSnapshot` inside `payload`) back to the Supervisor without polluting the Supervisor's system prompt with subagent-specific JSON schemas.
 
 ## Two-Tier Chat Search with Jev Reranking
 
@@ -25,10 +36,11 @@ When `vaultSearchAndManageAgent.ts` searches documents via the Chat-Bot:
 ## Steps to Add a New Subagent
 
 1. **Create the Manifest (`camelCaseAgent.ts`, max 250 lines)**:
-   Place inside the owning feature's `agents/` folder. Include `agentId`, `department`, `jevCriteria`, strict Zod `inputSchema` & `outputSchema` (no `any`), and `execute(input, graphState)` (respecting `MAX_STEPS = 4`).
-2. **Enforce Double Zod Barrier, Separate Files Default & Secret Safety**:
+   Place inside the owning feature's `agents/` folder. Include `agentId`, `department`, `jevCriteria`, strict Zod `inputSchema` & `outputSchema` (no `any`), and `execute(input)` returning the standard envelope (`AssistantTurnResult` with `payload.agentStateSnapshot` for multi-turn memory).
+2. **Enforce Double Zod Barrier, Single-Pass Ingestion, Separate Files Default & Secret Safety**:
    - Validate inputs and LLM JSON outputs with `.safeParse()` inside `try/catch`.
+   - Consume `input.ingestedAttachment` instead of re-running Vision OCR inside the subagent.
    - Never merge separate documents into one PDF unless the user explicitly requests merging.
    - Never inject decrypted password values (`is_secret = true`) into vector embeddings or unredacted logs.
 3. **Register & Test (`<name>Agent.test.ts`)**:
-   - Register in the central registry consumed by both `jevRouter.ts` and `traditionalSupervisor.ts`, add Vitest unit tests, and run `pnpm verify`.
+   - Register in `SUBAGENT_REGISTRY` (`supervisorGraph.ts`), consumed by `jevRouter.ts` and `traditionalSupervisor.ts`, add Vitest unit tests, and run `pnpm verify`.

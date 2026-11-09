@@ -33,6 +33,12 @@ reviews:
         2. Сигурност на пароли (`vault_items`): Пароли и тайни (`is_secret = true`) НИКОГА не трябва да се записват в прав текст в базата данни и НИКОГА не трябва да се подават за генериране на embeddings/вектори. Задължително използвай сървърно `AES-256-GCM` криптиране.
         3. Пълно физическо изтриване (Hard Purge Everywhere): При изтриване на документ провери дали се изтрива едновременно физическият файл от частния bucket `kronos-vault` в Supabase Storage, редът и векторът от Supabase PostgreSQL и дали се почистват референциите/кешът без да остават следи.
         4. Изолиран Storage слой: Файловите заявки трябва да минават само през `src/features/storage/dal/storageDal.ts`, за да може при бъдеща нужда доставчикът на сторидж да се смени на едно място.
+        5. Йерархична AI Архитектура (`Supervisor ➔ Jev ➔ Sub-Agents ➔ Sub-Tools`):
+           - Единственият вход и изход за потребителя в чата е `Supervisor Agent`-ът (`supervisorGraph.ts`).
+           - Когато има прикачен файл в чата (`attachment != null`), `Supervisor`-ът прочита файла ЕДНОКРАТНО преди да извика `Jev` (`Pre-Jev Ingestion` чрез `supervisorIngestion.ts`), подава резюмето на `Jev` за точно маршрутизиране и предава вече извлечения `ingestedAttachment` към избрания субагент (без двойно извикване на Vision OCR в субагентите).
+           - Под `Jev` стоят три основни потока: `general_chat` (`generalChatAgent.ts` — Normal AI Model за ежедневна употреба, разбиращ снимки/файлове и имащ достъп до RAG запис), `vault_search_and_manage` (`vaultSearchAndManageAgent.ts`) и `german_bureaucracy` (`germanBureaucracyAgent.ts`), като архитектурата позволява добавяне на нови независими субагенти със собствени `sub-tools`.
+           - Субагентите връщат строг структуриран изход (`Standard Envelope` + `agentStateSnapshot`) към `Supervisor`-а, без да се тъпчат вътрешните JSON схеми на всички субагенти в системния промпт на `Supervisor`-а.
+           - Паметта на разговора е централизирана единствено в `Supervisor`-а (`SQL DB`); при повторно викане на субагент в същия разговор `Supervisor`-ът му подава целенасочен `Context Slice` (последните реплики + `previousAgentState` на съответния субагент).
 
     - path: "supabase/**"
       instructions: |

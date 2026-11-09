@@ -27,7 +27,7 @@ import {
   appendChatMessage,
   createChatSession,
   deleteChatSessionHard,
-  getRecentChatHistory,
+  getRecentChatContext,
   resolveChatSession,
 } from './assistantChatDal';
 import { loadAssistantWorkspaceSnapshot } from './assistantMessagesDal';
@@ -146,7 +146,10 @@ export const sendAssistantMessageAction = async (
     let sessionId: string;
     try {
       sessionId = await resolveChatSession(parsed.data.sessionId, titleSeed);
-      const history = await getRecentChatHistory(sessionId, 6);
+      const { history, agentStatesByDepartment } = await getRecentChatContext(
+        sessionId,
+        6
+      );
 
       const userVisibleText = attachment
         ? persistedMessage
@@ -163,6 +166,7 @@ export const sendAssistantMessageAction = async (
       const turn = await runKronosSupervisorGraph({
         message,
         attachment: attachment ?? null,
+        agentStatesByDepartment,
         history,
       });
 
