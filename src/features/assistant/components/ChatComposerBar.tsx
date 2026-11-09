@@ -1,14 +1,21 @@
 'use client';
 
 import React, { useRef, useState } from 'react';
-import { Loader2, Paperclip, Send, X } from 'lucide-react';
+import { Camera, Loader2, Paperclip, Send, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { FILE_INPUT_ACCEPT_STRING } from '@/features/storage';
+import { useIsMobileCameraDevice } from '@/lib/ui/useIsMobileCameraDevice';
 import type { SendMessagePayload } from '../hooks/useAssistantChat';
+import { VoiceModeControls } from './VoiceModeControls';
 
 interface ChatComposerBarProps {
   readonly isSending: boolean;
   readonly uploadStatus: string | null;
   readonly draftPrompt: string;
+  readonly latestAssistantReply: {
+    readonly id: string;
+    readonly text: string;
+  } | null;
   readonly onDraftPromptChange: (next: string) => void;
   readonly onSend: (payload: SendMessagePayload) => Promise<void>;
 }
@@ -17,20 +24,21 @@ export const ChatComposerBar: React.FC<ChatComposerBarProps> = ({
   isSending,
   uploadStatus,
   draftPrompt,
+  latestAssistantReply,
   onDraftPromptChange,
   onSend,
 }) => {
   const t = useTranslations('chat');
+  const isMobileCamera = useIsMobileCameraDevice();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const cameraInputRef = useRef<HTMLInputElement | null>(null);
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
-  const [saveToVault, setSaveToVault] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   const latestDraftRef = useRef(draftPrompt);
   latestDraftRef.current = draftPrompt;
   const latestFileRef = useRef(attachedFile);
   latestFileRef.current = attachedFile;
-  const latestSaveRef = useRef(saveToVault);
-  latestSaveRef.current = saveToVault;
 
   const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const items = e.clipboardData?.items;
@@ -42,7 +50,12 @@ export const ChatComposerBar: React.FC<ChatComposerBarProps> = ({
         const blob = item.getAsFile();
         if (blob) {
           e.preventDefault();
-          const ext = blob.type === 'image/jpeg' ? 'jpg' : blob.type === 'image/webp' ? 'webp' : 'png';
+          const ext =
+            blob.type === 'image/jpeg'
+              ? 'jpg'
+              : blob.type === 'image/webp'
+                ? 'webp'
+                : 'png';
           const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
           const named = new File([blob], `Portal_Screenshot_${stamp}.${ext}`, {
             type: blob.type || 'image/png',
@@ -54,29 +67,23 @@ export const ChatComposerBar: React.FC<ChatComposerBarProps> = ({
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const trimmed = draftPrompt.trim();
-    if ((!trimmed && !attachedFile) || isSending) {
+  const dispatchMessage = async (messageText: string, fileToAttach: File | null) => {
+    const trimmed = messageText.trim();
+    if ((!trimmed && !fileToAttach) || isSending) {
       return;
     }
 
     const prevDraft = draftPrompt;
     const prevFile = attachedFile;
-    const prevSaveToVault = saveToVault;
-
-    const payload: SendMessagePayload = {
-      message: trimmed,
-      file: attachedFile,
-      saveToVault,
-    };
 
     onDraftPromptChange('');
     setAttachedFile(null);
-    setSaveToVault(false);
 
     try {
-      await onSend(payload);
+      await onSend({
+        message: trimmed,
+        file: fileToAttach,
+      });
     } catch {
       if (latestDraftRef.current === '') {
         onDraftPromptChange(prevDraft);
@@ -84,17 +91,19 @@ export const ChatComposerBar: React.FC<ChatComposerBarProps> = ({
       if (latestFileRef.current === null) {
         setAttachedFile(prevFile);
       }
-      if (latestSaveRef.current === false) {
-        setSaveToVault(prevSaveToVault);
-      }
     }
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    await dispatchMessage(draftPrompt, attachedFile);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       if ((draftPrompt.trim() || attachedFile) && !isSending) {
-        void handleSubmit(e as unknown as React.FormEvent<HTMLFormElement>);
+        void dispatchMessage(draftPrompt, attachedFile);
       }
     }
   };
@@ -102,8 +111,39 @@ export const ChatComposerBar: React.FC<ChatComposerBarProps> = ({
   return (
     <form
       onSubmit={(e) => void handleSubmit(e)}
-      className="rounded-3xl border border-zinc-800/90 bg-zinc-950/90 p-3 sm:p-4 shadow-2xl backdrop-blur-2xl space-y-2.5"
+      onDragOver={(e) => {
+        e.preventDefault();
+        setIsDragging(true);
+      }}
+      onDragLeave={() => setIsDragging(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setIsDragging(false);
+        const droppedFile = e.dataTransfer.files?.[0] ?? null;
+        if (droppedFile) {
+          setAttachedFile(droppedFile);
+        }
+      }}
+      className={`rounded-3xl border p-3 sm:p-4 shadow-2xl backdrop-blur-2xl space-y-2.5 transition-all ${
+        isDragging
+          ? 'border-cyan-400 bg-cyan-500/10'
+          : 'border-zinc-800/90 bg-zinc-950/90'
+      }`}
     >
+      <VoiceModeControls
+        isSending={isSending}
+        latestAssistantReply={latestAssistantReply}
+        onAppendDictatedText={(spokenText) => {
+          const next = latestDraftRef.current
+            ? `${latestDraftRef.current.trim()} ${spokenText}`
+            : spokenText;
+          onDraftPromptChange(next);
+        }}
+        onHandsFreeSend={async (spokenText) => {
+          await dispatchMessage(spokenText, latestFileRef.current);
+        }}
+      />
+
       {attachedFile && (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-cyan-500/30 bg-cyan-500/10 px-3.5 py-2 text-xs">
           <div className="flex items-center gap-2 min-w-0">
@@ -116,17 +156,10 @@ export const ChatComposerBar: React.FC<ChatComposerBarProps> = ({
             </span>
           </div>
 
-          <div className="flex items-center gap-3">
-            <label className="inline-flex items-center gap-1.5 cursor-pointer text-xs font-medium text-cyan-200">
-              <input
-                type="checkbox"
-                checked={saveToVault}
-                onChange={(e) => setSaveToVault(e.target.checked)}
-                aria-label={t('saveToVaultToggle')}
-                className="h-3.5 w-3.5 rounded border-zinc-700 bg-zinc-900 text-cyan-500 focus:ring-cyan-500"
-              />
-              <span>{t('saveToVaultToggle')}</span>
-            </label>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-mono text-cyan-200">
+              Кажете или напишете „Запази го“, за да влезе в RAG сейфа
+            </span>
             <button
               type="button"
               onClick={() => setAttachedFile(null)}
@@ -150,7 +183,7 @@ export const ChatComposerBar: React.FC<ChatComposerBarProps> = ({
         <input
           ref={fileInputRef}
           type="file"
-          accept="application/pdf,image/jpeg,image/png,image/webp"
+          accept={FILE_INPUT_ACCEPT_STRING}
           aria-label={t('attachFile')}
           className="hidden"
           onChange={(e) => {
@@ -171,6 +204,35 @@ export const ChatComposerBar: React.FC<ChatComposerBarProps> = ({
         >
           <Paperclip className="h-4 w-4" aria-hidden="true" />
         </button>
+
+        {isMobileCamera && (
+          <>
+            <input
+              ref={cameraInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              aria-label="Снимай документ с камерата"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0] ?? null;
+                if (file) {
+                  setAttachedFile(file);
+                }
+                e.target.value = '';
+              }}
+            />
+            <button
+              type="button"
+              disabled={isSending}
+              onClick={() => cameraInputRef.current?.click()}
+              aria-label="Снимай документ директно с камерата"
+              className="shrink-0 flex h-11 w-11 items-center justify-center rounded-2xl border border-zinc-800 bg-zinc-900 text-cyan-400 hover:border-cyan-500/40 disabled:opacity-40 transition-all"
+            >
+              <Camera className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </>
+        )}
 
         <textarea
           rows={2}

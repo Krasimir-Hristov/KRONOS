@@ -11,6 +11,8 @@ import {
   Trash2,
   UploadCloud,
 } from 'lucide-react';
+import { FILE_INPUT_ACCEPT_STRING } from '@/features/storage';
+import { useIsMobileCameraDevice } from '@/lib/ui/useIsMobileCameraDevice';
 import type {
   EnqueueFilesResult,
   UploadQueueTask,
@@ -31,6 +33,7 @@ export const BulkUploadDropzone: React.FC<BulkUploadDropzoneProps> = ({
   onClearFinished,
 }) => {
   const t = useTranslations('documents');
+  const isMobileCamera = useIsMobileCameraDevice();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -125,7 +128,7 @@ export const BulkUploadDropzone: React.FC<BulkUploadDropzoneProps> = ({
               ref={fileInputRef}
               type="file"
               multiple
-              accept="application/pdf,image/jpeg,image/png,image/webp"
+              accept={FILE_INPUT_ACCEPT_STRING}
               aria-label="Избор на файлове за качване"
               onChange={(e) => {
                 const picked = Array.from(e.target.files ?? []);
@@ -137,32 +140,36 @@ export const BulkUploadDropzone: React.FC<BulkUploadDropzoneProps> = ({
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              aria-label="Избери PDF или снимки от устройството"
+              aria-label="Избери документи, снимки или таблици от устройството"
               className="inline-flex items-center gap-2 rounded-xl bg-linear-to-r from-cyan-500 via-indigo-600 to-violet-600 px-4 py-2.5 text-xs sm:text-sm font-bold text-white shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/35 hover:brightness-110 active:scale-95 transition-all"
             >
               <FileUp className="h-4 w-4" aria-hidden="true" />
               <span>{t('uploadButton')}</span>
             </button>
 
-            <input
-              ref={cameraInputRef}
-              type="file"
-              multiple
-              accept="image/jpeg,image/png,image/webp"
-              capture="environment"
-              aria-label="Снимай страници на писмо от телефон"
-              onChange={handleCameraAdd}
-              className="hidden"
-            />
-            <button
-              type="button"
-              onClick={() => cameraInputRef.current?.click()}
-              aria-label="Снимай многостранично хартиено писмо в 1 PDF"
-              className="inline-flex items-center gap-2 rounded-xl border border-zinc-700/80 bg-zinc-900/90 px-4 py-2.5 text-xs sm:text-sm font-semibold text-zinc-200 hover:border-cyan-500/40 hover:text-cyan-300 active:scale-95 transition-all"
-            >
-              <Camera className="h-4 w-4 text-cyan-400" aria-hidden="true" />
-              <span>{t('cameraPdfButton')}</span>
-            </button>
+            {isMobileCamera && (
+              <>
+                <input
+                  ref={cameraInputRef}
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  capture="environment"
+                  aria-label="Снимай страници на писмо от телефон"
+                  onChange={handleCameraAdd}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => cameraInputRef.current?.click()}
+                  aria-label="Снимай многостранично хартиено писмо в 1 PDF"
+                  className="inline-flex items-center gap-2 rounded-xl border border-zinc-700/80 bg-zinc-900/90 px-4 py-2.5 text-xs sm:text-sm font-semibold text-zinc-200 hover:border-cyan-500/40 hover:text-cyan-300 active:scale-95 transition-all"
+                >
+                  <Camera className="h-4 w-4 text-cyan-400" aria-hidden="true" />
+                  <span>{t('cameraPdfButton')}</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
 

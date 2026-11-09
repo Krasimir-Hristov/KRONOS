@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useQueryClient } from '@tanstack/react-query';
 import { Bot, FileSearch, Landmark, Loader2, ShieldKeyhole, Sparkles } from 'lucide-react';
@@ -70,6 +70,16 @@ export const AssistantWorkspace: React.FC<AssistantWorkspaceProps> = ({
   useEffect(() => {
     bottomAnchorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [chat.messages.length, chat.sendMessageMutation.isPending]);
+
+  const latestAssistantReply = useMemo(() => {
+    for (let i = chat.messages.length - 1; i >= 0; i -= 1) {
+      const m = chat.messages[i];
+      if (m && m.role === 'assistant') {
+        return { id: m.id, text: m.content };
+      }
+    }
+    return null;
+  }, [chat.messages]);
 
   const activeError =
     chat.errorBanner ?? (chat.isWorkspaceLoaded ? null : initialLoadError);
@@ -209,6 +219,7 @@ export const AssistantWorkspace: React.FC<AssistantWorkspaceProps> = ({
               isSending={chat.sendMessageMutation.isPending}
               uploadStatus={chat.uploadStatus}
               draftPrompt={draftPrompt}
+              latestAssistantReply={latestAssistantReply}
               onDraftPromptChange={setDraftPrompt}
               onSend={async (payload) => {
                 await chat.sendMessageMutation.mutateAsync(payload);

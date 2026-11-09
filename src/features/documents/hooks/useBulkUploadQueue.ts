@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import {
   ALLOWED_MIME_TYPES,
   MAX_FILE_SIZE_BYTES,
+  normalizeUploadFileForVault,
   uploadFileToSignedVaultUrl,
   type AllowedMimeType,
 } from '@/features/storage';
@@ -104,7 +105,11 @@ export const useBulkUploadQueue = () => {
         await runBoundedConcurrency(
           prepared,
           UPLOAD_CONCURRENCY,
-          async ({ localId, file }) => {
+          async ({ localId, file: rawFile }) => {
+            const normalized = await normalizeUploadFileForVault(rawFile);
+            const file = normalized.file;
+            const mimeType = normalized.mimeType;
+
             if (file.size <= 0 || file.size > MAX_FILE_SIZE_BYTES) {
               failedCount += 1;
               patchTask(localId, {
@@ -114,16 +119,22 @@ export const useBulkUploadQueue = () => {
               return;
             }
 
-            if (!ALLOWED_MIME_TYPES.includes(file.type as AllowedMimeType)) {
+            if (
+              !mimeType ||
+              !ALLOWED_MIME_TYPES.includes(mimeType as AllowedMimeType)
+            ) {
               failedCount += 1;
               patchTask(localId, {
                 step: 'error',
-                detailMessage: 'Разрешени са само PDF, JPEG, PNG и WebP.',
+                detailMessage:
+                  'Неподдържан файлов формат. Разрешени са PDF, изображения, Word, Excel, HTML, CSV, TXT, MD, JSON и XML.',
               });
               return;
             }
 
             patchTask(localId, {
+              fileName: file.name,
+              fileSizeBytes: file.size,
               step: 'uploading',
               detailMessage: 'Качване в сейфа...',
             });
@@ -132,7 +143,7 @@ export const useBulkUploadQueue = () => {
               const signedRes = await requestDocumentUploadUrlAction({
                 fileName: file.name,
                 fileSizeBytes: file.size,
-                mimeType: file.type,
+                mimeType,
               });
 
               if (!signedRes.ok) {
@@ -144,13 +155,13 @@ export const useBulkUploadQueue = () => {
                 signedRes.data.storagePath,
                 signedRes.data.token,
                 file,
-                file.type
+                mimeType
               );
 
               const regRes = await registerUploadedDocumentAction({
                 storagePath: signedRes.data.storagePath,
                 originalFileName: file.name,
-                mimeType: file.type,
+                mimeType,
                 fileSizeBytes: file.size,
               });
 
@@ -161,7 +172,7 @@ export const useBulkUploadQueue = () => {
               uploadedForOcr.push({ localId, documentId: regRes.data.id });
               patchTask(localId, {
                 documentId: regRes.data.id,
-                detailMessage: 'В опашка за OCR & RAG вектори...',
+                detailMessage: 'В опашка за извличане & RAG вектори...',
               });
             } catch (err) {
               failedCount += 1;
@@ -182,13 +193,13 @@ export const useBulkUploadQueue = () => {
           async ({ localId, documentId }) => {
             patchTask(localId, {
               step: 'analyzing',
-              detailMessage: 'OCR анализ (DE/BG/EL) + RAG вектор...',
+              detailMessage: 'Анализ на съдържанието (DE/BG/EL) + RAG вектор...',
             });
 
             const ocrRes = await processDocumentOcrAction({ id: documentId }).catch(
               (): { readonly ok: false; readonly errorMessage: string } => ({
                 ok: false,
-                errorMessage: 'Грешка при стартиране на OCR анализа.',
+                errorMessage: 'Грешка при стартиране на анализа.',
               })
             );
 

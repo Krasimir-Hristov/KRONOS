@@ -4,6 +4,7 @@ import {
   processQueuedDocumentOcrAndRag,
   registerPendingDocument,
 } from '@/features/documents/server';
+import { isTextOrOfficeMimeType } from '@/features/ingestion/server';
 import { sanitizeFileNameSlug } from '@/features/storage';
 import {
   createVaultSignedDownloadUrl,
@@ -102,7 +103,11 @@ export const buildVisionSourceFromAttachment = async (
       );
     }
 
-    if (attachment.fileSizeBytes <= INLINE_VISION_MAX_BYTES) {
+    const needsBytes =
+      attachment.fileSizeBytes <= INLINE_VISION_MAX_BYTES ||
+      isTextOrOfficeMimeType(attachment.mimeType);
+
+    if (needsBytes) {
       const { bytes } = await downloadVaultObjectBytes(attachment.storagePath);
       return { fileName: attachment.fileName, mimeType: attachment.mimeType, bytes };
     }

@@ -1,10 +1,13 @@
 import 'server-only';
 import { requireAuthAndPin } from '@/features/auth/server';
 import {
+  extractUniversalDocumentContent,
+  isTextOrOfficeMimeType,
+} from '@/features/ingestion/server';
+import {
   createVaultSignedDownloadUrl,
   downloadVaultObjectBytes,
 } from '@/features/storage/server';
-import { extractDocumentWithVisionOcr } from '@/lib/ai/documentOcrService';
 import {
   buildDocumentEmbeddingInput,
   generateTextEmbedding,
@@ -46,21 +49,24 @@ export const processQueuedDocumentOcrAndRag = async (
     .eq('owner_id', userId);
 
   try {
-    const ocrSource =
-      doc.file_size_bytes <= INLINE_OCR_MAX_BYTES
-        ? {
-            fileName: doc.original_file_name,
-            mimeType: doc.mime_type,
-            bytes: (await downloadVaultObjectBytes(doc.storage_path)).bytes,
-          }
-        : {
-            fileName: doc.original_file_name,
-            mimeType: doc.mime_type,
-            signedUrl: (await createVaultSignedDownloadUrl(doc.storage_path, 120))
-              .signedUrl,
-          };
+    const needsBytes =
+      doc.file_size_bytes <= INLINE_OCR_MAX_BYTES ||
+      isTextOrOfficeMimeType(doc.mime_type);
 
-    const ocrResult = await extractDocumentWithVisionOcr(ocrSource);
+    const ocrSource = needsBytes
+      ? {
+          fileName: doc.original_file_name,
+          mimeType: doc.mime_type,
+          bytes: (await downloadVaultObjectBytes(doc.storage_path)).bytes,
+        }
+      : {
+          fileName: doc.original_file_name,
+          mimeType: doc.mime_type,
+          signedUrl: (await createVaultSignedDownloadUrl(doc.storage_path, 120))
+            .signedUrl,
+        };
+
+    const ocrResult = await extractUniversalDocumentContent(ocrSource);
 
     let serializedVector: string | null = null;
     try {

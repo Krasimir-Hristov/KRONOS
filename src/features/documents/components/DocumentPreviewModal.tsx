@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
-import { Loader2, Save, X } from 'lucide-react';
+import { Download, FileText, Loader2, Save, X } from 'lucide-react';
 import {
   getDialogFocusableElements,
   useDialogFocusTrap,
@@ -51,11 +51,8 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
     const loadUrl = async () => {
       const res = await getDocumentSignedUrlAction({ storagePath: doc.storagePath });
       if (!active) return;
-      if (res.ok) {
-        setSignedUrl(res.data.signedUrl);
-      } else {
-        setUrlError(res.errorMessage);
-      }
+      if (res.ok) setSignedUrl(res.data.signedUrl);
+      else setUrlError(res.errorMessage);
     };
     void loadUrl();
     return () => {
@@ -86,6 +83,9 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
     }
   };
 
+  const isPdf = doc.mimeType === 'application/pdf';
+  const isImage = doc.mimeType.startsWith('image/');
+
   return (
     <div
       ref={dialogRef}
@@ -114,14 +114,10 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
             </div>
           )}
           {urlError && <p className="text-sm text-rose-400">{urlError}</p>}
-          {signedUrl && doc.mimeType === 'application/pdf' && (
-            <iframe
-              src={signedUrl}
-              title={doc.title}
-              className="h-full w-full rounded-xl bg-white"
-            />
+          {signedUrl && isPdf && (
+            <iframe src={signedUrl} title={doc.title} className="h-full w-full rounded-xl bg-white" />
           )}
-          {signedUrl && doc.mimeType !== 'application/pdf' && (
+          {signedUrl && isImage && (
             <Image
               src={signedUrl}
               alt={doc.title}
@@ -130,6 +126,27 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
               unoptimized
               className="max-h-full w-auto object-contain rounded-xl"
             />
+          )}
+          {signedUrl && !isPdf && !isImage && (
+            <div className="max-w-lg rounded-2xl border border-zinc-800 bg-zinc-950/90 p-6 text-center space-y-4">
+              <FileText className="mx-auto h-12 w-12 text-cyan-400" aria-hidden="true" />
+              <p className="text-sm font-semibold text-white">{doc.originalFileName}</p>
+              {doc.summaryText && (
+                <p className="text-xs text-zinc-300 leading-relaxed text-left whitespace-pre-wrap">
+                  {doc.summaryText}
+                </p>
+              )}
+              <a
+                href={signedUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`Свали оригиналния файл ${doc.originalFileName}`}
+                className="inline-flex items-center gap-2 rounded-xl bg-cyan-500/15 border border-cyan-500/30 px-4 py-2 text-xs font-bold text-cyan-300 hover:bg-cyan-500/25"
+              >
+                <Download className="h-4 w-4" aria-hidden="true" />
+                <span>Свали оригиналния файл</span>
+              </a>
+            </div>
           )}
         </div>
 
@@ -172,9 +189,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                 className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-2.5 py-2 text-base md:text-xs text-white focus:border-cyan-500 focus:outline-none"
               >
                 {DOCUMENT_TOPICS.map((t) => (
-                  <option key={t} value={t}>
-                    {DOCUMENT_TOPIC_LABELS_BG[t]}
-                  </option>
+                  <option key={t} value={t}>{DOCUMENT_TOPIC_LABELS_BG[t]}</option>
                 ))}
               </select>
             </div>
@@ -187,9 +202,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                 className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-2.5 py-2 text-base md:text-xs text-white focus:border-cyan-500 focus:outline-none"
               >
                 {DOCUMENT_TYPES.map((dt) => (
-                  <option key={dt} value={dt}>
-                    {DOCUMENT_TYPE_LABELS_BG[dt]}
-                  </option>
+                  <option key={dt} value={dt}>{DOCUMENT_TYPE_LABELS_BG[dt]}</option>
                 ))}
               </select>
             </div>
@@ -232,17 +245,14 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
           {doc.summaryText && (
             <div className="rounded-xl border border-zinc-800 bg-zinc-900/70 p-3">
               <span className="block text-[11px] font-mono font-semibold text-cyan-300 mb-1">
-                OCR Резюме:
+                Извлечено Резюме:
               </span>
               <p className="text-xs text-zinc-300 leading-relaxed">{doc.summaryText}</p>
             </div>
           )}
 
           {saveError && (
-            <p
-              role="alert"
-              className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-3.5 py-2.5 text-xs text-rose-300"
-            >
+            <p role="alert" className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-3.5 py-2.5 text-xs text-rose-300">
               {saveError}
             </p>
           )}

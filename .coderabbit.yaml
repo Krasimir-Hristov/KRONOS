@@ -22,7 +22,7 @@ reviews:
         Провери стриктно всяко изменение спрямо инженерната конституция в `AGENTS.md`:
         1. Именуване: Всички спомагателни/логически файлове и функции вътре в тях ТРЯБВА да са в `camelCase` (`camelCase.ts` / `camelCase.test.ts`), а всички React компоненти в `PascalCase.tsx` и задължително дефинирани като Arrow Functions (изключение за имената на файловете са само системните маршрутни файлове на Next.js 16 в `src/app/` и `src/proxy.ts`).
         2. Забрана за `middleware.ts`: Никога не допускай `middleware.ts`. Мрежовият периметър е единствено в `src/proxy.ts` с Allowlist Header Scrubbing срещу CVE-2025-29927.
-        3. Лимит на размер и модулност: Нито един файл в `src/` не може да надвишава 300 реда. Feature модулите в `src/features/<featureName>/` се импортират отвън само през техния `index.ts`.
+        3. Лимит на размер и модулност: Нито един файл в `src/` не може да надвишава 300 реда. Feature модулите в `src/features/<featureName>/` се импортират отвън само през техния `index.ts` (или `server.ts` за сървърни DAL модули).
         4. Строг TypeScript и двойна Zod бариера: Абсолютна забрана за `any`. Всички външни входове и отговори от OpenRouter / API-та се валидират със `schema.safeParse()` в `try/catch` блок без изтичане на сурови системни грешки към клиента.
         5. React & UI стандарт: Семантичен HTML5, `aria-label` на интерактивните елементи, `next-intl` за текстовете и Tailwind CSS v4 градиенти (`bg-linear-to-*`, никога `bg-gradient-to-*`).
 
@@ -32,13 +32,14 @@ reviews:
         1. Защита на данните (Defense in Depth): Всеки DAL метод и Server Action трябва да извиква сървърната проверка за Supabase сесия + 4-цифрен ПИН (и допълнително Step-Up ПИН потвърждение при четене, промяна или изтриване на пароли!).
         2. Сигурност на пароли (`vault_items`): Пароли и тайни (`is_secret = true`) НИКОГА не трябва да се записват в прав текст в базата данни и НИКОГА не трябва да се подават за генериране на embeddings/вектори. Задължително използвай сървърно `AES-256-GCM` криптиране.
         3. Пълно физическо изтриване (Hard Purge Everywhere): При изтриване на документ провери дали се изтрива едновременно физическият файл от частния bucket `kronos-vault` в Supabase Storage, редът и векторът от Supabase PostgreSQL и дали се почистват референциите/кешът без да остават следи.
-        4. Изолиран Storage слой: Файловите заявки трябва да минават само през `src/features/storage/dal/storageDal.ts`, за да може при бъдеща нужда доставчикът на сторидж да се смени на едно място.
-        5. Йерархична AI Архитектура (`Supervisor ➔ Jev ➔ Sub-Agents ➔ Sub-Tools`):
+        4. Изолиран Storage слой и 15+ Универсални Формата: Файловите заявки минават само през `src/features/storage/dal/storageDal.ts`, а входните файлове се нормализират през `fileFormatNormalizer.ts` (`.jfif` -> `.jpg`, нестандартни изображения към JPEG/PNG, запазване на PDF, WebP, DOCX, XLSX, CSV, HTML, TXT, MD, JSON, XML).
+        5. Универсален Ingestion Модул (`src/features/ingestion/`): Текстови, уеб и офис файлове (`.docx`, `.xlsx`, `.csv`, `.html`, `.txt`, `.md`, `.json`, `.xml`) се извличат чрез `0.00 €` локални детерминистични парсъри (`deterministicParsers.ts`), а PDF и изображения минават през еднократен Vision OCR пас (`universalIngestionDal.ts`).
+        6. Йерархична AI Архитектура (`Supervisor ➔ Jev ➔ Sub-Agents ➔ Sub-Tools`):
            - Единственият вход и изход за потребителя в чата е `Supervisor Agent`-ът (`supervisorGraph.ts`).
            - Когато има прикачен файл в чата (`attachment != null`), `Supervisor`-ът прочита файла ЕДНОКРАТНО преди да извика `Jev` (`Pre-Jev Ingestion` чрез `supervisorIngestion.ts`), подава резюмето на `Jev` за точно маршрутизиране и предава вече извлечения `ingestedAttachment` към избрания субагент (без двойно извикване на Vision OCR в субагентите).
            - Под `Jev` стоят три основни потока: `general_chat` (`generalChatAgent.ts` — Normal AI Model за ежедневна употреба, разбиращ снимки/файлове и имащ достъп до RAG запис), `vault_search_and_manage` (`vaultSearchAndManageAgent.ts`) и `german_bureaucracy` (`germanBureaucracyAgent.ts`), като архитектурата позволява добавяне на нови независими субагенти със собствени `sub-tools`.
            - Субагентите връщат строг структуриран изход (`Standard Envelope` + `agentStateSnapshot`) към `Supervisor`-а, без да се тъпчат вътрешните JSON схеми на всички субагенти в системния промпт на `Supervisor`-а.
-           - Паметта на разговора е централизирана единствено в `Supervisor`-а (`SQL DB`); при повторно викане на субагент в същия разговор `Supervisor`-ът му подава целенасочен `Context Slice` (последните реплики + `previousAgentState` на съответния субагент).
+           - Паметта на разговора е централизирана единствено в `Supervisor`-а (`SQL DB`); при повторно викане на субагент в същия разговор `Supervisor`-ът му подава целенасочен `Context Slice` (последните реплики + `previousAgentState` на съответния субагент), включително поддръжка на разговорен HITL за потвърждение с текст или глас и 3 комуникационни режима (`VoiceModeControls.tsx`: Текст, Диктуване, Гласов разговор Hands-Free).
 
     - path: "supabase/**"
       instructions: |

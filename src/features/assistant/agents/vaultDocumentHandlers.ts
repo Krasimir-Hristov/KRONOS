@@ -1,6 +1,10 @@
 import 'server-only';
 import type { CatalogDocumentItem } from '@/features/documents';
-import { updateApprovedDocumentMetadata } from '@/features/documents/server';
+import {
+  purgeDocumentsHard,
+  updateApprovedDocumentMetadata,
+} from '@/features/documents/server';
+import { purgeVaultFactsBatch } from '@/features/vault/server';
 import type { JevRerankStatus } from '../schemas/jevSchema';
 import type { HandlerOutput, VaultHandlerContext } from './agentTypes';
 import { runDocumentSearch, type HybridSearchFn } from './vaultDocumentSearch';
@@ -8,6 +12,9 @@ import { splitIntoZones, type SplitZonesDeps } from './zoneRanking';
 
 const NOT_FOUND_TEXT =
   'Не намерих подходящ документ. Опитайте с друга ключова дума (напр. институция или тема) или прегледайте Документния Сейф.';
+
+export const CONVERSATIONAL_DELETE_CONFIRM_REGEX =
+  /^(?:да|потвърждавам|съгласен\s+съм|изтрий\s+(?:го|ги|я|всички)|да[,.\s]+(?:изтрий|потвърждавам)|потвърждавам\s+изтриването|yes[,.\s]*delete)/i;
 
 export interface DocumentHandlerDeps {
   readonly search?: HybridSearchFn;
@@ -21,6 +28,69 @@ interface ZonedSearch {
   readonly usedJev: boolean;
   readonly jevStatus: JevRerankStatus;
 }
+
+export const tryExecutePendingDeleteConfirmation = async (
+  message: string,
+  previousAgentState: Record<string, unknown> | null
+): Promise<HandlerOutput | null> => {
+  if (!previousAgentState || !CONVERSATIONAL_DELETE_CONFIRM_REGEX.test(message.trim())) {
+    return null;
+  }
+
+  const pending = previousAgentState.pendingConfirmDelete as
+    | {
+        readonly target?: unknown;
+        readonly ids?: unknown;
+      }
+    | undefined;
+
+  if (!pending || !Array.isArray(pending.ids) || pending.ids.length === 0) {
+    return null;
+  }
+
+  const validIds = pending.ids.filter(
+    (id): id is string => typeof id === 'string' && id.length > 0
+  );
+  if (validIds.length === 0) {
+    return null;
+  }
+
+  if (pending.target === 'documents') {
+    const res = await purgeDocumentsHard(validIds);
+    return {
+      replyText: `✅ Потвърдено! Изтрих завинаги (100% Hard Purge) ${res.purgedCount} документа (физически файл в Storage + OCR + вектори).`,
+      payload: {
+        actions: [
+          {
+            kind: 'notice',
+            tone: 'success',
+            text: `Изтрити завинаги документи: ${res.purgedCount}`,
+            documentId: null,
+          },
+        ],
+      },
+    };
+  }
+
+  if (pending.target === 'facts') {
+    const purgedCount = await purgeVaultFactsBatch(validIds);
+    return {
+      replyText: `✅ Потвърдено! Изтрих завинаги (100% Hard Purge) ${purgedCount} лични записа от сейфа.`,
+      payload: {
+        actions: [
+          {
+            kind: 'notice',
+            tone: 'success',
+            text: `Изтрити лични записи: ${purgedCount}`,
+            documentId: null,
+          },
+        ],
+      },
+    };
+  }
+
+  return null;
+};
 
 const searchAndZone = async (
   ctx: VaultHandlerContext,
@@ -146,7 +216,7 @@ export const handleDeleteDocuments = async (
 
   return {
     replyText:
-      'Намерих следното за изтриване. Изтриването е необратимо — файлът, OCR текстът и векторите се заличават от навсякъде. Потвърдете с бутона.',
+      'Намерих следното за изтриване. Изтриването е необратимо — файлът, OCR текстът и векторите се заличават от навсякъде. Потвърдете с бутона или кажете „Да, изтрий го“.',
     payload: {
       actions: [
         {

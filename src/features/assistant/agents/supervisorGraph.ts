@@ -22,6 +22,7 @@ import {
   ingestAttachmentForSupervisor,
   type SupervisorIngestionDeps,
 } from './supervisorIngestion';
+import { CONVERSATIONAL_DELETE_CONFIRM_REGEX } from './vaultDocumentHandlers';
 import { vaultSearchAndManageAgent } from './vaultSearchAndManageAgent';
 
 export type AgentStatesByDepartment = Readonly<
@@ -111,18 +112,27 @@ export const runKronosSupervisorGraph = async (
   };
   const nowIso = input.nowIso ?? new Date().toISOString();
 
-  /**
-   * Node 1: Supervisor Gatekeeper
-   * - Performs single-pass Pre-Jev Ingestion ONLY if an attachment is present.
-   * - Invokes Jev Router (with backup fallback) using the message + ingested attachment digest.
-   * - Slices conversation memory for the target subagent (`activeAgentPrevState`).
-   */
   const supervisorNode = async (state: SupervisorGraphState) => {
     const ingested =
       state.ingestedAttachment ??
       (state.attachment
         ? await ingestAttachmentForSupervisor(state.attachment, deps)
         : null);
+
+    const vaultPrevState = state.agentStatesByDepartment.vault_search_and_manage ?? null;
+    if (
+      vaultPrevState?.pendingConfirmDelete &&
+      CONVERSATIONAL_DELETE_CONFIRM_REGEX.test(state.userMessage.trim())
+    ) {
+      return {
+        ingestedAttachment: ingested,
+        routedDepartment: 'vault_search_and_manage' as const,
+        routedIntent: 'delete_document' as const,
+        routedTier: 'local' as const,
+        activeAgentPrevState: vaultPrevState,
+        stepCount: 1,
+      };
+    }
 
     const attachmentDigest = buildAttachmentRoutingDigest(ingested, state.attachment);
 
@@ -150,10 +160,6 @@ export const runKronosSupervisorGraph = async (
     };
   };
 
-  /**
-   * Node 2: Specialized Sub-Agent Execution
-   * Receives the pre-ingested attachment and its own previous structured state snapshot.
-   */
   const buildSubagentNode = (department: AssistantDepartment) => {
     return async (state: SupervisorGraphState) => {
       const manifest = registry[department];
@@ -175,11 +181,6 @@ export const runKronosSupervisorGraph = async (
     };
   };
 
-  /**
-   * Node 3: Supervisor Final Responder & Memory Recorder
-   * Collects the subagent's structured envelope, records its state snapshot in central memory,
-   * and emits the final response back to the user.
-   */
   const supervisorFinalizeNode = async (state: SupervisorGraphState) => {
     if (!state.turnResult) {
       return { stepCount: 1 };

@@ -1,8 +1,8 @@
 import 'server-only';
-import {
-  extractDocumentWithVisionOcr,
-  type OcrDocumentInput,
-  type OcrExtractionResult,
+import { extractUniversalDocumentContent } from '@/features/ingestion/server';
+import type {
+  OcrDocumentInput,
+  OcrExtractionResult,
 } from '@/lib/ai/documentOcrService';
 import { buildVisionSourceFromAttachment } from '../dal/assistantAttachmentDal';
 import {
@@ -39,7 +39,10 @@ export const ingestAttachmentForSupervisor = async (
 
   try {
     const buildSource = deps.buildVisionSource ?? buildVisionSourceFromAttachment;
-    const runOcr = deps.extractOcr ?? extractDocumentWithVisionOcr;
+    const runOcr =
+      deps.extractOcr ??
+      ((source: OcrDocumentInput, fetchImpl?: typeof fetch) =>
+        extractUniversalDocumentContent(source, { fetchImpl }));
 
     const source = await buildSource(attachment);
     const extracted = await runOcr(source, deps.fetchImpl);

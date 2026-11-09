@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ALLOWED_MIME_TYPES } from '@/features/storage';
 import { vaultCategorySchema, type VaultCategory } from '@/features/vault';
 import { isSuspectedSecretFact } from '@/lib/security/secretFactGuard';
 
@@ -128,7 +129,7 @@ export type DocumentReviewMeta = z.infer<typeof documentReviewMetaSchema>;
 export const registerPendingDocumentSchema = z.object({
   storagePath: z.string().trim().min(5).max(500),
   originalFileName: z.string().trim().min(1).max(255),
-  mimeType: z.enum(['application/pdf', 'image/jpeg', 'image/png', 'image/webp']),
+  mimeType: z.enum(ALLOWED_MIME_TYPES),
   fileSizeBytes: z.number().int().positive().max(52_428_800),
 });
 

@@ -6,6 +6,7 @@ import { requestDocumentUploadUrlAction } from '@/features/documents';
 import {
   ALLOWED_MIME_TYPES,
   MAX_FILE_SIZE_BYTES,
+  normalizeUploadFileForVault,
   uploadFileToSignedVaultUrl,
   type AllowedMimeType,
 } from '@/features/storage';
@@ -29,11 +30,11 @@ export const ASSISTANT_QUERY_KEYS = {
 export interface SendMessagePayload {
   readonly message: string;
   readonly file: File | null;
-  readonly saveToVault: boolean;
+  readonly saveToVault?: boolean;
 }
 
-const isAllowedMime = (mime: string): mime is AllowedMimeType =>
-  (ALLOWED_MIME_TYPES as readonly string[]).includes(mime);
+const isAllowedMime = (mime: string | null): mime is AllowedMimeType =>
+  mime !== null && (ALLOWED_MIME_TYPES as readonly string[]).includes(mime);
 
 export const useAssistantChat = (initialSnapshot?: AssistantWorkspaceSnapshot) => {
   const queryClient = useQueryClient();
@@ -84,12 +85,17 @@ export const useAssistantChat = (initialSnapshot?: AssistantWorkspaceSnapshot) =
 
       try {
         if (payload.file) {
-          const file = payload.file;
+          const normalized = await normalizeUploadFileForVault(payload.file);
+          const file = normalized.file;
+          const mimeType = normalized.mimeType;
+
           if (file.size <= 0 || file.size > MAX_FILE_SIZE_BYTES) {
             throw new Error('Файлът трябва да е между 1 байт и 50 MB.');
           }
-          if (!isAllowedMime(file.type)) {
-            throw new Error('Разрешени са само PDF, JPEG, PNG и WebP файлове.');
+          if (!isAllowedMime(mimeType)) {
+            throw new Error(
+              'Неподдържан формат. Разрешени са PDF, изображения, Word, Excel, HTML, CSV, TXT, MD, JSON и XML.'
+            );
           }
 
           setUploadStatus(`Защитено качване на „${file.name}“...`);
@@ -97,7 +103,7 @@ export const useAssistantChat = (initialSnapshot?: AssistantWorkspaceSnapshot) =
             const signed = await requestDocumentUploadUrlAction({
               fileName: file.name,
               fileSizeBytes: file.size,
-              mimeType: file.type,
+              mimeType,
             });
             if (!signed.ok) {
               throw new Error(signed.errorMessage);
@@ -108,16 +114,16 @@ export const useAssistantChat = (initialSnapshot?: AssistantWorkspaceSnapshot) =
               signed.data.storagePath,
               signed.data.token,
               file,
-              file.type
+              mimeType
             );
             uploadedPath = signed.data.storagePath;
 
             attachment = {
               storagePath: signed.data.storagePath,
               fileName: file.name,
-              mimeType: file.type,
+              mimeType,
               fileSizeBytes: file.size,
-              saveToVault: payload.saveToVault,
+              saveToVault: payload.saveToVault ?? false,
             };
           } finally {
             setUploadStatus(null);

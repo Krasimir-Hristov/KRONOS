@@ -17,6 +17,7 @@ import {
   handleDeleteDocuments,
   handleSearchDocuments,
   handleUpdateDocument,
+  tryExecutePendingDeleteConfirmation,
   type DocumentHandlerDeps,
 } from './vaultDocumentHandlers';
 import {
@@ -183,7 +184,17 @@ export const executeVaultAgent = async (
     let plannedTopic: string | null = null;
 
     try {
-      if (input.intent === 'manage_secret' || isSecretIntentMessage(input.message)) {
+      const confirmedDelete = await tryExecutePendingDeleteConfirmation(
+        input.message,
+        input.previousAgentState
+      );
+      if (confirmedDelete) {
+        output = confirmedDelete;
+        plannedAction = 'confirmed_delete';
+      } else if (
+        input.intent === 'manage_secret' ||
+        isSecretIntentMessage(input.message)
+      ) {
         output = handleSecretsRequest(input.message);
         plannedAction = 'manage_secret';
       } else {
@@ -224,6 +235,10 @@ export const executeVaultAgent = async (
       output = { replyText: GENERIC_ERROR_TEXT };
     }
 
+    const confirmDeleteAction = output.payload?.actions?.find(
+      (a) => a.kind === 'confirm_delete'
+    );
+
     const payloadParsed = assistantTurnPayloadSchema.safeParse({
       department: 'vault_search_and_manage',
       intent: input.intent,
@@ -233,6 +248,13 @@ export const executeVaultAgent = async (
         lastAction: plannedAction,
         lastTopic: plannedTopic,
         lastZone1Ids: output.zone1Ids ?? [],
+        pendingConfirmDelete:
+          confirmDeleteAction && confirmDeleteAction.kind === 'confirm_delete'
+            ? {
+                target: confirmDeleteAction.target,
+                ids: confirmDeleteAction.ids,
+              }
+            : null,
       },
       ...output.payload,
     });
