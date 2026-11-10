@@ -106,7 +106,23 @@ export const useBulkUploadQueue = () => {
           prepared,
           UPLOAD_CONCURRENCY,
           async ({ localId, file: rawFile }) => {
-            const normalized = await normalizeUploadFileForVault(rawFile);
+            let normalized: {
+              readonly file: File;
+              readonly mimeType: AllowedMimeType | null;
+            };
+            try {
+              normalized = await normalizeUploadFileForVault(rawFile);
+            } catch (normErr) {
+              failedCount += 1;
+              patchTask(localId, {
+                step: 'error',
+                detailMessage:
+                  normErr instanceof Error
+                    ? normErr.message
+                    : 'Грешка при нормализиране на файла.',
+              });
+              return;
+            }
             const file = normalized.file;
             const mimeType = normalized.mimeType;
 

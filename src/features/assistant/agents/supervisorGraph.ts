@@ -102,6 +102,9 @@ export interface SupervisorGraphDeps extends JevRouterDeps, SupervisorIngestionD
   readonly registry?: Readonly<Partial<Record<AssistantDepartment, SubAgentManifest>>>;
 }
 
+const DELETE_PROMPT_HISTORY_REGEX =
+  /(?:Намерих следното за изтриване|Потвърдете,\s+за\s+да\s+(?:го|ги)\s+изтрия\s+завинаги)/i;
+
 export const runKronosSupervisorGraph = async (
   input: RunKronosSupervisorInput,
   deps: SupervisorGraphDeps = {}
@@ -114,8 +117,15 @@ export const runKronosSupervisorGraph = async (
 
   const supervisorNode = async (state: SupervisorGraphState) => {
     const vaultPrevState = state.agentStatesByDepartment.vault_search_and_manage ?? null;
+    const lastAssistantTurn = [...state.history]
+      .reverse()
+      .find((m) => m.role === 'assistant');
+    const isDeletePromptActive =
+      Boolean(vaultPrevState?.pendingConfirmDelete) &&
+      Boolean(lastAssistantTurn && DELETE_PROMPT_HISTORY_REGEX.test(lastAssistantTurn.content));
+
     if (
-      vaultPrevState?.pendingConfirmDelete &&
+      isDeletePromptActive &&
       CONVERSATIONAL_DELETE_CONFIRM_REGEX.test(state.userMessage.trim())
     ) {
       return {
@@ -148,7 +158,13 @@ export const runKronosSupervisorGraph = async (
       deps
     );
 
-    const prevState = state.agentStatesByDepartment[routed.department] ?? null;
+    const rawPrevState = state.agentStatesByDepartment[routed.department] ?? null;
+    const prevState =
+      routed.department === 'vault_search_and_manage' &&
+      rawPrevState?.pendingConfirmDelete &&
+      !isDeletePromptActive
+        ? { ...rawPrevState, pendingConfirmDelete: null }
+        : rawPrevState;
 
     return {
       ingestedAttachment: ingested,

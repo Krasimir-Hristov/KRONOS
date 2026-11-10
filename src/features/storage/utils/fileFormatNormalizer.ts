@@ -66,6 +66,11 @@ export const normalizeUploadFileForVault = async (
     if (converted) {
       return { file: converted, mimeType: 'image/jpeg' };
     }
+    if (ext === 'heic' || ext === 'heif') {
+      throw new Error(
+        'Форматът HEIC/HEIF не може да бъде преобразуван в този браузър. Моля, използвайте Safari или качете JPEG/PNG.'
+      );
+    }
     if (ext === 'jfif') {
       const renamed = new File([rawFile], replaceExtensionWithJpg(rawFile.name), {
         type: 'image/jpeg',

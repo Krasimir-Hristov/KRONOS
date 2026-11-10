@@ -180,6 +180,7 @@ export const executeVaultAgent = async (
 
     let output: HandlerOutput;
     let aiAvailable = true;
+    let executionFailed = false;
     let plannedAction = 'search_documents';
     let plannedTopic: string | null = null;
 
@@ -231,6 +232,7 @@ export const executeVaultAgent = async (
         );
       }
     } catch (err) {
+      executionFailed = true;
       console.error('[VaultAgent] execution failed:', err);
       output = { replyText: GENERIC_ERROR_TEXT };
     }
@@ -250,11 +252,10 @@ export const executeVaultAgent = async (
         lastZone1Ids: output.zone1Ids ?? [],
         pendingConfirmDelete:
           confirmDeleteAction && confirmDeleteAction.kind === 'confirm_delete'
-            ? {
-                target: confirmDeleteAction.target,
-                ids: confirmDeleteAction.ids,
-              }
-            : null,
+            ? { target: confirmDeleteAction.target, ids: confirmDeleteAction.ids }
+            : executionFailed
+              ? (input.previousAgentState?.pendingConfirmDelete ?? null)
+              : null,
       },
       ...output.payload,
     });

@@ -118,7 +118,7 @@
     "newSession": "Нов разговор",
     "sessionsTitle": "Разговори",
     "emptySessions": "Още няма проведени разговори.",
-    "attachFile": "Прикачи PDF или снимка",
+    "attachFile": "Прикачи файл (документ, снимка или таблица)",
     "saveToVaultToggle": "Запази копие в RAG Сейфа",
     "pasteHint": "Поддържа директно поставяне на скрийншот с Ctrl+V и файлове до 50 MB",
     "zone1Title": "ЗОНА 1 • Най-точно попадение (Jev Reranking)",

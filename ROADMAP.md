@@ -39,6 +39,7 @@ flowchart LR
 ## 📌 Детайлен Обхват по Фази
 
 ### ✅ Фаза 0: Инженерна Конституция, Автоматични Проверки & Скелет (ЗАВЪРШЕНА)
+
 - [x] Върховна конституция в `AGENTS.md` и `.coderabbit.yaml` на български език (`bg-BG`).
 - [x] 4 специализирани Antigravity скила в `.agents/skills/` + автоматичен страж `verifyArchitecture.mjs` (`camelCase.ts` за спомагателни файлове/функции, `PascalCase.tsx` с Arrow Functions за компоненти, лимит 300 реда, без `middleware.ts`).
 - [x] Защитен мрежов периметър `src/proxy.ts` с Allowlist Header Scrubbing срещу CVE-2025-29927.
@@ -47,6 +48,7 @@ flowchart LR
 ---
 
 ### ✅ Фаза 1: Supabase DB + Supabase Storage, Вход с 4-Цифрен ПИН, Криптиране & LangGraph Ядро (ЗАВЪРШЕНА)
+
 - [x] **Инсталиране на основните пакети (изчистено, без външни S3 библиотеки):**
   - `@langchain/core`, `@langchain/langgraph`, `@langchain/openai` (насочен към OpenRouter).
   - `next-intl` (официална i18n система на Български чрез `src/i18n/request.ts` и `messages/bg.json`).
@@ -68,6 +70,7 @@ flowchart LR
 ---
 
 ### ✅ Фаза 2: Директен Масов RAG Сейф (`/documents`) & Ръчен Панел за Данни и Пароли (`/vault`) (ЗАВЪРШЕНА)
+
 *(Веднага след Фаза 2 започваш директно да качваш всички документи в сейфа, без да ти трябва дори чатът!)*
 - [x] **Масово Drag & Drop Качване в RAG Сейфа (10–20+ файла наведнъж) + Снимане от Телефон:**
   - Качване на готови PDF-и (`Kontoauszüge`, договори, актове) от компютър или многостранични снимки от телефон ➔ PDF в Supabase Storage (`kronos-vault`).
@@ -82,6 +85,7 @@ flowchart LR
 ---
 
 ### ✅ Фаза 3: Йерархичен LangGraph Supervisor, `Jev` Маршрутизиране, Ежедневен AI Модел & Специализирани Субагенти (ЗАВЪРШЕНА & РЕФАКТОРИРАНА)
+
 - [x] **Йерархичен LangGraph Supervisor (`supervisorGraph.ts` + `supervisorIngestion.ts`):**
   - **Единствен вход и изход за потребителя:** Поема съобщението и ако има прикачен файл (`attachment != null`), извършва еднократно четене (`Pre-Jev Ingestion`), преди да подаде заявката към `Jev`.
   - **Централизирана Памет (`Central Memory + State Snapshot`):** Само `Supervisor`-ът държи глобалната история в `SQL DB` и при повторно викане на субагент в същия разговор му подава `Context Slice` (последните реплики + `previousAgentState` на същия субагент).
@@ -94,6 +98,7 @@ flowchart LR
 ---
 
 ### ✅ Фаза 4: Production Hardening, PWA Мобилна Готовност & Vercel Настройки (ЗАВЪРШЕНА)
+
 - [x] **PWA & Динамични икони:** Динамично генерирани `src/app/icon.tsx` (`512x512`) и `src/app/apple-icon.tsx` (`180x180`), standalone `manifest.ts` и `viewport` конфигурация за iOS/Android инсталация на начален екран.
 - [x] **Глобална Устойчивост (`i18n` + `a11y`):** Нови `error.tsx` (с `retry()`), `not-found.tsx` и `loading.tsx` (със screen-reader live region), преведени през `next-intl` (`messages/bg.json`).
 - [x] **Vercel Serverless Timeouts & Документация:** `maxDuration = 60` в `(workspace)/layout.tsx` за продължителни OCR и LangGraph операции и пълно ръководство за Production деплой в `README.md`.
@@ -101,6 +106,7 @@ flowchart LR
 ---
 
 ### ✅ Фаза 5А: Универсален Входен Модул `src/features/ingestion/` & Smart Upload UI (ЗАВЪРШЕНА)
+
 - [x] **Пълен универсален пакет от 15+ файлови формата (вкл. `.jfif` и уеб формати):**
   - **Всички видове снимки:** `.jfif`, `.webp`, `.jpg`/`.jpeg`, `.png`, `.heic`/`.heif`, `.gif`, `.bmp`, `.avif` — нестандартните формати (`.jfif`, `.heic`, `.bmp`, `.avif`, `.gif`) се преобразуват автоматично при качване в чист висококачествен `JPEG`/`PNG` за 100% съвместимост навсякъде (`fileFormatNormalizer.ts`), докато `WebP`, `PDF`, уеб и офис файловете се пазят в оригинал.
   - **Документи, уеб страници и данни:** `PDF`, запазени уеб страници (`.html` / `.htm`), офис документи и таблици (`.docx`, `.xlsx`, `.csv`) и текстови/даннови формати (`.txt`, `.md`, `.json`, `.xml`) + миграция на `allowed_mime_types` за `kronos-vault` (`20261109000001_phase5_universal_formats.sql`).
@@ -115,10 +121,11 @@ flowchart LR
 ---
 
 ### ✅ Фаза 5Б: Разговорни HITL Потвърждения & 3 Гласови Режима (ЗАВЪРШЕНА)
+
 - [x] **Автоматично почистване на временни прикачени файлове:**
   - При въпрос по снимка/файл без команда за запис временният файл се изтрива веднага след отговора (`cleanupTemporaryAttachment` в `assistantActions.ts`).
 - [x] **Разговорен Human-in-the-Loop (с текст или глас):**
-  - Записът в сейфа (`SAVE_TO_RAG_REGEX` в `generalChatAgent.ts`) и потвърждението за `100% Hard Purge` изтриване (`tryExecutePendingDeleteConfirmation` във `vaultDocumentHandlers.ts` + `pendingConfirmDelete` в `agentStateSnapshot`) работят директно чрез естествена команда с текст или глас (*„Да, изтрий го“* / *„Запази го в сейфа“*).
+  - Записът в сейфа (`SAVE_TO_RAG_REGEX` в `assistantSchema.ts`) и потвърждението за `100% Hard Purge` изтриване (`tryExecutePendingDeleteConfirmation` във `vaultDocumentHandlers.ts` + `pendingConfirmDelete` в `agentStateSnapshot`) работят директно чрез естествена команда с текст или глас (*„Да, изтрий го“* / *„Запази го в сейфа“*).
 - [x] **3 Режима на Комуникация (`VoiceModeControls.tsx` — идеално и при шофиране):**
   - **⌨️ Текст:** стандартен вход с клавиатура.
   - **🎙️ Диктуване:** гласово диктуване с микрофона директно в полето за текст.
@@ -127,4 +134,5 @@ flowchart LR
 ---
 
 ## 🔮 Следващи Самостоятелни Модули (След Фаза 5Б)
+
 Благодарение на централния `src/features/ingestion/` модул, `Pre-Jev` маршрутизирането и разговорните HITL/гласови тулове, всеки следващ модул (напр. **AI Счетоводител** за касови бележки, фактури и сортиране на разходи по дати/артикули) се включва като изолиран Plug-and-Play субагент без дублиране на качване или OCR логика.

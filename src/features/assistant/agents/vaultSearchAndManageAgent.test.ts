@@ -196,6 +196,8 @@ describe('vaultSearchAndManageAgent', () => {
 
   it('accepts explicit delete confirmations and rejects false-positive phrases starting with да', () => {
     expect(CONVERSATIONAL_DELETE_CONFIRM_REGEX.test('Да, изтрий го')).toBe(true);
+    expect(CONVERSATIONAL_DELETE_CONFIRM_REGEX.test('Да изтрий всичко')).toBe(true);
+    expect(CONVERSATIONAL_DELETE_CONFIRM_REGEX.test('да.')).toBe(true);
     expect(CONVERSATIONAL_DELETE_CONFIRM_REGEX.test('Потвърждавам изтриването.')).toBe(
       true
     );
@@ -206,5 +208,6 @@ describe('vaultSearchAndManageAgent', () => {
       false
     );
     expect(CONVERSATIONAL_DELETE_CONFIRM_REGEX.test('Да не го изтриваш')).toBe(false);
+    expect(CONVERSATIONAL_DELETE_CONFIRM_REGEX.test('Да, но не сега')).toBe(false);
   });
 });

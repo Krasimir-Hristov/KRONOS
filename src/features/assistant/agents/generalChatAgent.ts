@@ -5,6 +5,7 @@ import { callJsonModel, type LlmTextInvoker } from '@/lib/ai/llmJsonService';
 import { saveAttachmentToVault } from '../dal/assistantAttachmentDal';
 import {
   agentExecutionInputSchema,
+  AMBIGUOUS_SAVE_DESTINATION_REGEX,
   assistantTurnPayloadSchema,
   assistantTurnResultSchema,
   SAVE_TO_RAG_REGEX,
@@ -120,6 +121,16 @@ export const executeGeneralChatAgent = async (
           documentId: null,
         });
       }
+    } else if (
+      input.attachment &&
+      AMBIGUOUS_SAVE_DESTINATION_REGEX.test(input.message)
+    ) {
+      actions.push({
+        kind: 'notice',
+        tone: 'warning',
+        text: 'Уточнете дали желаете да запазя файла в RAG Сейфа на KRONOS (напр. „Запази го в сейфа“).',
+        documentId: null,
+      });
     }
 
     try {

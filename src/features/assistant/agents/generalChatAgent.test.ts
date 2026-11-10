@@ -59,7 +59,9 @@ describe('generalChatAgent & Hierarchical Supervisor Architecture', () => {
   it('saves attached file to RAG system only on explicit vault/file save commands', async () => {
     expect(SAVE_TO_RAG_REGEX.test('запази спокойствие')).toBe(false);
     expect(SAVE_TO_RAG_REGEX.test('Wie viel Speicher hat der Laptop?')).toBe(false);
+    expect(SAVE_TO_RAG_REGEX.test('Запази документа на десктопа')).toBe(false);
     expect(SAVE_TO_RAG_REGEX.test('Запази снимката в сейфа')).toBe(true);
+    expect(SAVE_TO_RAG_REGEX.test('save this file to vault')).toBe(true);
     expect(SAVE_TO_RAG_REGEX.test('Dokument speichern')).toBe(true);
 
     const mockSave = vi.fn().mockResolvedValue({

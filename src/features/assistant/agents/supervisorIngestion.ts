@@ -61,7 +61,17 @@ export const ingestAttachmentForSupervisor = async (
       suggestedFacts: extracted.suggestedFacts,
     });
 
-    return parsed.success ? parsed.data : null;
+    if (!parsed.success) {
+      const failedPaths = parsed.error.issues
+        .map((issue) => issue.path.join('.') || '<root>')
+        .join(', ');
+      console.warn(
+        `[SupervisorIngestion] Validation failed for ingested attachment (${attachment.fileName}) at fields: ${failedPaths}`
+      );
+      return null;
+    }
+
+    return parsed.data;
   } catch (err) {
     console.warn('[SupervisorIngestion] Single-pass pre-Jev ingestion degraded:', err);
     return null;

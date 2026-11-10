@@ -63,11 +63,8 @@ export const useBrowserVoiceSession = ({
 
   const recognitionRef = useRef<SpeechRecognitionInstanceLike | null>(null);
   const modeRef = useRef<CommunicationMode>(mode);
-  modeRef.current = mode;
   const onAppendDictatedTextRef = useRef(onAppendDictatedText);
-  onAppendDictatedTextRef.current = onAppendDictatedText;
   const onHandsFreeSendRef = useRef(onHandsFreeSend);
-  onHandsFreeSendRef.current = onHandsFreeSend;
   const lastSpokenMessageIdRef = useRef<string | null>(
     latestAssistantReply?.id ?? null
   );
@@ -110,6 +107,7 @@ export const useBrowserVoiceSession = ({
         instance.interimResults = false;
 
         instance.onresult = (event) => {
+          if (recognitionRef.current !== instance) return;
           let finalTranscript = '';
           for (let i = event.resultIndex; i < event.results.length; i += 1) {
             const res = event.results[i];
@@ -127,8 +125,16 @@ export const useBrowserVoiceSession = ({
           }
         };
 
-        instance.onerror = () => setIsListening(false);
-        instance.onend = () => setIsListening(false);
+        instance.onerror = () => {
+          if (recognitionRef.current !== instance) return;
+          recognitionRef.current = null;
+          setIsListening(false);
+        };
+        instance.onend = () => {
+          if (recognitionRef.current !== instance) return;
+          recognitionRef.current = null;
+          setIsListening(false);
+        };
 
         recognitionRef.current = instance;
         instance.start();
@@ -139,6 +145,12 @@ export const useBrowserVoiceSession = ({
     },
     [stopListening, stopSpeaking]
   );
+
+  useEffect(() => {
+    modeRef.current = mode;
+    onAppendDictatedTextRef.current = onAppendDictatedText;
+    onHandsFreeSendRef.current = onHandsFreeSend;
+  }, [mode, onAppendDictatedText, onHandsFreeSend]);
 
   useEffect(() => {
     if (!latestAssistantReply) return;
