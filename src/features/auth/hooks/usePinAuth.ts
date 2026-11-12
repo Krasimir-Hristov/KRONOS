@@ -29,8 +29,12 @@ export const usePinAuth = ({
     setErrorMessage(null);
     try {
       const res = await fetch('/api/auth/logout', { method: 'POST' });
-      if (!res.ok) {
-        setErrorMessage(t('networkError'));
+      const rawJson: unknown = await res.json().catch(() => null);
+      const parsed = authApiResponseSchema.safeParse(rawJson);
+
+      if (!res.ok || !parsed.success || !parsed.data.ok) {
+        const errorMsg = parsed.success ? parsed.data.errorMessage : null;
+        setErrorMessage(errorMsg ?? t('networkError'));
         setIsSubmitting(false);
         return;
       }

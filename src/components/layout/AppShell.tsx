@@ -171,34 +171,42 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
       </aside>
 
       {/* Mobile Tech Header */}
-      <header className="lg:hidden sticky top-0 z-40 flex items-center justify-between border-b border-zinc-800 bg-zinc-950/85 backdrop-blur-2xl px-4 py-3">
-        <Link href="/" aria-label="KRONOS Начало" className="flex items-center gap-2.5">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-linear-to-tr from-cyan-500 via-indigo-600 to-violet-600 text-white shadow-md shadow-cyan-500/20">
-            <Cpu className="h-5 w-5" aria-hidden="true" />
-          </span>
-          <span className="font-black tracking-widest text-white text-base">KRONOS</span>
-        </Link>
+      <header className="lg:hidden sticky top-0 z-40 flex flex-col border-b border-zinc-800 bg-zinc-950/85 backdrop-blur-2xl px-4 py-3">
+        <div className="flex items-center justify-between">
+          <Link href="/" aria-label="KRONOS Начало" className="flex items-center gap-2.5">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-linear-to-tr from-cyan-500 via-indigo-600 to-violet-600 text-white shadow-md shadow-cyan-500/20">
+              <Cpu className="h-5 w-5" aria-hidden="true" />
+            </span>
+            <span className="font-black tracking-widest text-white text-base">KRONOS</span>
+          </Link>
 
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            disabled={isPending}
-            onClick={handleLockPin}
-            aria-label={appT('lockPin')}
-            className="p-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-cyan-400"
-          >
-            <Lock className="h-4 w-4" aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            disabled={isPending}
-            onClick={handleSignOut}
-            aria-label={appT('signOut')}
-            className="p-2 rounded-xl bg-zinc-900 border border-zinc-800 text-rose-400 hover:text-rose-300"
-          >
-            <LogOut className="h-4 w-4" aria-hidden="true" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={isPending}
+              onClick={handleLockPin}
+              aria-label={appT('lockPin')}
+              className="p-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-cyan-400"
+            >
+              <Lock className="h-4 w-4" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              disabled={isPending}
+              onClick={handleSignOut}
+              aria-label={appT('signOut')}
+              className="p-2 rounded-xl bg-zinc-900 border border-zinc-800 text-rose-400 hover:text-rose-300"
+            >
+              <LogOut className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
         </div>
+
+        {actionError && (
+          <p role="alert" className="mt-2 text-[11px] font-medium text-rose-400 text-center animate-shake">
+            {actionError}
+          </p>
+        )}
       </header>
 
       {/* Main Content Area */}
