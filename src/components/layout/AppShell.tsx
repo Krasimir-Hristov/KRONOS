@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useTransition } from 'react';
+import React, { useState, useTransition } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -27,6 +27,8 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
   const appT = useTranslations('app');
   const [isPending, startTransition] = useTransition();
 
+  const [actionError, setActionError] = useState<string | null>(null);
+
   const navItems = [
     { href: '/', label: t('chat'), icon: MessageSquareCode, exact: true },
     { href: '/documents', label: t('documents'), icon: FileCode2, exact: false },
@@ -34,28 +36,34 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
   ] as const;
 
   const handleLockPin = () => {
+    setActionError(null);
     startTransition(async () => {
       try {
         const res = await fetch('/api/auth/lock', { method: 'POST' });
         if (res.ok) {
           window.location.replace('/pin');
+          return;
         }
+        setActionError(t('lockError'));
       } catch {
-        // Network error; retain screen
+        setActionError(t('lockError'));
       }
     });
   };
 
   const handleSignOut = () => {
+    setActionError(null);
     startTransition(async () => {
       try {
         const res = await fetch('/api/auth/logout', { method: 'POST' });
         if (res.ok) {
           queryClient.clear();
           window.location.replace('/login');
+          return;
         }
+        setActionError(t('signOutError'));
       } catch {
-        // Network error; retain screen
+        setActionError(t('signOutError'));
       }
     });
   };
@@ -153,6 +161,12 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
               <span>{appT('signOut')}</span>
             </button>
           </div>
+
+          {actionError && (
+            <p role="alert" className="text-[11px] font-medium text-rose-400 text-center animate-shake">
+              {actionError}
+            </p>
+          )}
         </div>
       </aside>
 

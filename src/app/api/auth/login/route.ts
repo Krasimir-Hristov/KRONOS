@@ -4,10 +4,34 @@ import { createServerSupabaseClient } from '@/lib/supabase/supabaseServer';
 
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const MAX_LOGIN_ATTEMPTS = 10;
+const MAX_TRACKED_IPS = 1000;
 const ipAttempts = new Map<string, number[]>();
+
+const cleanupExpiredAttempts = (now: number): void => {
+  for (const [ip, timestamps] of ipAttempts.entries()) {
+    const valid = timestamps.filter((t) => now - t < RATE_LIMIT_WINDOW_MS);
+    if (valid.length === 0) {
+      ipAttempts.delete(ip);
+    } else if (valid.length !== timestamps.length) {
+      ipAttempts.set(ip, valid);
+    }
+  }
+};
 
 const isRateLimited = (ip: string): boolean => {
   const now = Date.now();
+
+  if (ipAttempts.size > MAX_TRACKED_IPS / 2) {
+    cleanupExpiredAttempts(now);
+  }
+
+  if (ipAttempts.size >= MAX_TRACKED_IPS && !ipAttempts.has(ip)) {
+    const oldestKey = ipAttempts.keys().next().value;
+    if (oldestKey) {
+      ipAttempts.delete(oldestKey);
+    }
+  }
+
   const timestamps = ipAttempts.get(ip) ?? [];
   const recent = timestamps.filter((t) => now - t < RATE_LIMIT_WINDOW_MS);
   if (recent.length >= MAX_LOGIN_ATTEMPTS) {

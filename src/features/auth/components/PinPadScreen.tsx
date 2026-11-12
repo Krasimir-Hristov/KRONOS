@@ -1,10 +1,9 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 import { Delete, KeyRound, Lock, RotateCcw, ShieldAlert } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { authApiResponseSchema } from '../schemas/authSchema';
+import { usePinAuth } from '../hooks/usePinAuth';
 
 interface PinPadScreenProps {
   readonly initialHasPin?: boolean;
@@ -17,13 +16,28 @@ export const PinPadScreen: React.FC<PinPadScreenProps> = ({
   isStepUp = false,
   onSuccess,
 }) => {
-  const queryClient = useQueryClient();
   const t = useTranslations('auth');
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [isConfirmingSetup, setIsConfirmingSetup] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const {
+    isSubmitting,
+    errorMessage,
+    setErrorMessage,
+    handleSwitchAccount,
+    triggerVerify,
+    triggerSetup,
+  } = usePinAuth({
+    isStepUp,
+    onSuccess,
+    onClearPin: () => setPin(''),
+    onClearSetup: () => {
+      setPin('');
+      setConfirmPin('');
+      setIsConfirmingSetup(false);
+    },
+  });
 
   const handleDigit = (digit: string) => {
     if (isSubmitting) return;
@@ -74,106 +88,18 @@ export const PinPadScreen: React.FC<PinPadScreenProps> = ({
     setErrorMessage(null);
   };
 
-  const handleSwitchAccount = async () => {
-    if (isSubmitting) return;
-    setIsSubmitting(true);
-    setErrorMessage(null);
-    try {
-      const res = await fetch('/api/auth/logout', { method: 'POST' });
-      if (!res.ok) {
-        setErrorMessage(t('networkError'));
-        setIsSubmitting(false);
-        return;
-      }
-      queryClient.clear();
-      window.location.replace('/login');
-    } catch {
-      setErrorMessage(t('networkError'));
-      setIsSubmitting(false);
-    }
-  };
-
-  const triggerVerify = async (code: string) => {
-    if (isSubmitting) return;
-    setIsSubmitting(true);
-
-    try {
-      const res = await fetch('/api/auth/pin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pin: code, isStepUp }),
-      });
-
-      const rawJson: unknown = await res.json().catch(() => null);
-      const parsed = authApiResponseSchema.safeParse(rawJson);
-
-      if (!res.ok || !parsed.success || !parsed.data.ok) {
-        const errorMsg = parsed.success ? parsed.data.errorMessage : null;
-        setErrorMessage(errorMsg ?? t('invalidPin'));
-        setPin('');
-        setIsSubmitting(false);
-        return;
-      }
-
-      if (isStepUp && onSuccess) {
-        onSuccess();
-        setIsSubmitting(false);
-        return;
-      }
-
-      window.location.replace('/');
-    } catch {
-      setErrorMessage(t('networkError'));
-      setPin('');
-      setIsSubmitting(false);
-    }
-  };
-
-  const triggerSetup = async (firstPin: string, secondPin: string) => {
-    if (isSubmitting) return;
-    setIsSubmitting(true);
-
-    try {
-      const res = await fetch('/api/auth/pin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pin: firstPin, confirmPin: secondPin }),
-      });
-
-      const rawJson: unknown = await res.json().catch(() => null);
-      const parsed = authApiResponseSchema.safeParse(rawJson);
-
-      if (!res.ok || !parsed.success || !parsed.data.ok) {
-        const errorMsg = parsed.success ? parsed.data.errorMessage : null;
-        setErrorMessage(errorMsg ?? t('invalidPin'));
-        setPin('');
-        setConfirmPin('');
-        setIsConfirmingSetup(false);
-        setIsSubmitting(false);
-        return;
-      }
-
-      window.location.replace('/');
-    } catch {
-      setErrorMessage(t('networkError'));
-      setPin('');
-      setConfirmPin('');
-      setIsConfirmingSetup(false);
-      setIsSubmitting(false);
-    }
-  };
-
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (/^[0-9]$/.test(e.key)) handleDigit(e.key);
-      else if (e.key === 'Backspace') handleDelete();
-      else if (e.key === 'Escape') handleClear();
+      if (e.key === 'Backspace') handleDelete();
+      if (e.key === 'Escape') handleClear();
     };
+
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   });
 
-  const activeInput = !initialHasPin && !isStepUp && isConfirmingSetup ? confirmPin : pin;
+  const activeInput = isConfirmingSetup ? confirmPin : pin;
 
   const headingText = isStepUp
     ? t('stepUpTitle')
