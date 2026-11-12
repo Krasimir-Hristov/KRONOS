@@ -1,19 +1,145 @@
 @import "tailwindcss";
 
 @layer base {
+  html,
   body {
-    @apply bg-zinc-950 text-zinc-100 antialiased selection:bg-cyan-500/25 selection:text-cyan-200;
-    background-image: 
-      radial-gradient(ellipse 80% 50% at 50% -20%, rgba(56, 189, 248, 0.08), transparent 70%),
-      radial-gradient(ellipse 60% 40% at 90% 10%, rgba(99, 102, 241, 0.06), transparent 60%);
+    @apply bg-[#060a0e] text-zinc-100 antialiased selection:bg-teal-500/30 selection:text-teal-200 overflow-x-hidden;
+    background-image:
+      radial-gradient(ellipse 80% 50% at 50% -15%, rgba(20, 184, 166, 0.11), transparent 70%),
+      radial-gradient(ellipse 55% 45% at 90% 15%, rgba(45, 212, 191, 0.06), transparent 65%),
+      radial-gradient(ellipse 60% 50% at 10% 85%, rgba(13, 148, 136, 0.07), transparent 65%);
     background-attachment: fixed;
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled),
+  a[href],
+  summary,
+  label[for],
+  select:not(:disabled) {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [role="button"]:disabled,
+  input:disabled,
+  textarea:disabled,
+  select:disabled {
+    cursor: not-allowed;
   }
 }
 
-/* Custom sleek scrollbar for tech aesthetics */
+/* GPU-composited butter-smooth keyframes (zero dropped frames / zero GC hitch) */
+@keyframes neuralPulse {
+  0%, 100% {
+    opacity: 0.32;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.62;
+    transform: scale(1.02);
+  }
+}
+
+@keyframes neuralThinkingSurge {
+  0%, 100% {
+    opacity: 0.72;
+    transform: scale(1);
+  }
+  35% {
+    opacity: 0.96;
+    transform: scale(1.03);
+  }
+  70% {
+    opacity: 0.88;
+    transform: scale(1.015);
+  }
+}
+
+/* Exact harmonic dash repetition (period = 24px, offset = 48px -> perfect zero-jump loop) */
+@keyframes synapseStream {
+  0% {
+    stroke-dashoffset: 48;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes thinkingColorCycle {
+  0%, 100% {
+    background-position: 0% 50%;
+    border-color: rgba(20, 184, 166, 0.6);
+    box-shadow: 0 0 24px rgba(20, 184, 166, 0.35);
+  }
+  50% {
+    background-position: 100% 50%;
+    border-color: rgba(34, 211, 238, 0.75);
+    box-shadow: 0 0 32px rgba(34, 211, 238, 0.5);
+  }
+}
+
+.animate-neural-idle {
+  animation: neuralPulse 5.5s ease-in-out infinite;
+  will-change: opacity, transform;
+  filter: drop-shadow(0 0 6px rgba(20, 184, 166, 0.35));
+}
+
+.animate-neural-thinking {
+  animation: neuralThinkingSurge 1.8s ease-in-out infinite;
+  will-change: opacity, transform;
+  filter: drop-shadow(0 0 14px rgba(45, 212, 191, 0.75));
+}
+
+.animate-synapse-flow {
+  stroke-dasharray: 10 14;
+  animation: synapseStream 2.4s linear infinite;
+  will-change: stroke-dashoffset;
+}
+
+.animate-synapse-fast {
+  stroke-dasharray: 10 14;
+  animation: synapseStream 0.8s linear infinite;
+  will-change: stroke-dashoffset;
+}
+
+.animate-thinking-surface {
+  background-size: 200% 200%;
+  animation: thinkingColorCycle 2.4s ease infinite;
+}
+
+/* Dynamic continuous light glint sweep across text from left to right */
+@keyframes kronosGlintSweep {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+.animate-kronos-glint {
+  background: linear-gradient(
+    115deg,
+    #14b8a6 0%,
+    #2dd4bf 22%,
+    #ffffff 48%,
+    #e6fffa 54%,
+    #2dd4bf 78%,
+    #14b8a6 100%
+  );
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: kronosGlintSweep 3.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  will-change: background-position;
+}
+
+/* Sleek custom scrollbars */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
@@ -21,10 +147,10 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.4);
+  background: rgba(45, 212, 191, 0.22);
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(56, 189, 248, 0.35);
+  background: rgba(45, 212, 191, 0.45);
 }

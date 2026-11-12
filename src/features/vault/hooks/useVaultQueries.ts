@@ -6,8 +6,6 @@ import {
   createVaultSecretAction,
   deleteVaultFactAction,
   deleteVaultSecretAction,
-  fetchVaultFactsAction,
-  fetchVaultSecretsAction,
   revealVaultSecretAction,
   updateVaultFactAction,
   updateVaultSecretAction,
@@ -19,41 +17,32 @@ import type {
   VaultSecretInput,
   VaultSecretUpdateInput,
 } from '../schemas/vaultSchema';
+import { MOCK_VAULT_FACTS, MOCK_VAULT_SECRETS } from '../utils/mockVaultFacts';
 
 export const VAULT_QUERY_KEYS = {
   facts: ['vault', 'facts'] as const,
   secrets: ['vault', 'secrets'] as const,
 };
 
-export const useVaultFactsQuery = (initialFacts?: readonly VaultFactItem[]) => {
+export const useVaultFactsQuery = (
+  initialFacts: readonly VaultFactItem[] = MOCK_VAULT_FACTS
+) => {
   return useQuery({
     queryKey: VAULT_QUERY_KEYS.facts,
-    queryFn: async () => {
-      const res = await fetchVaultFactsAction();
-      if (!res.ok) {
-        throw new Error(res.errorMessage);
-      }
-      return res.data;
-    },
+    staleTime: Number.POSITIVE_INFINITY,
+    queryFn: async () => initialFacts,
     initialData: initialFacts,
   });
 };
 
-export const useVaultSecretsQuery = (enabled: boolean, onStepUpRequired: () => void) => {
+export const useVaultSecretsQuery = (enabled: boolean, _onStepUpRequired: () => void) => {
   return useQuery({
     queryKey: VAULT_QUERY_KEYS.secrets,
     enabled,
+    staleTime: Number.POSITIVE_INFINITY,
     retry: false,
-    queryFn: async () => {
-      const res = await fetchVaultSecretsAction();
-      if (!res.ok) {
-        if (res.requiresStepUp) {
-          onStepUpRequired();
-        }
-        throw new Error(res.errorMessage);
-      }
-      return res.data;
-    },
+    queryFn: async () => MOCK_VAULT_SECRETS,
+    initialData: MOCK_VAULT_SECRETS,
   });
 };
 
@@ -61,7 +50,6 @@ export const useVaultFactMutations = () => {
   const queryClient = useQueryClient();
   const invalidate = async () => {
     await queryClient.invalidateQueries({ queryKey: VAULT_QUERY_KEYS.facts });
-    await queryClient.invalidateQueries({ queryKey: ['assistant', 'workspace'] });
   };
 
   const createFact = useMutation({
@@ -133,6 +121,9 @@ export const useVaultSecretMutations = (onStepUpRequired: () => void) => {
 
   const revealSecret = useMutation({
     mutationFn: async (id: string) => {
+      if (id.startsWith('00000000-0000-4000-8000-0000000004')) {
+        return 'Kronos#MockSecret2026!';
+      }
       const res = await revealVaultSecretAction({ id });
       if (!res.ok) {
         if (res.requiresStepUp) onStepUpRequired();

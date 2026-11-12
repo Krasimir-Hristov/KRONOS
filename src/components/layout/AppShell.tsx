@@ -1,44 +1,65 @@
 'use client';
 
-import React, { useState, useTransition } from 'react';
+import React, { useTransition } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  Cpu,
   FileCode2,
   KeySquare,
   Lock,
   LogOut,
   MessageSquareCode,
+  PanelLeftClose,
   ShieldCheck,
-  Sparkles,
 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
+import { SidebarProvider, useSidebar } from './SidebarContext';
+import { SidebarNavSections } from './SidebarNavSections';
 
 interface AppShellProps {
   readonly children: React.ReactNode;
 }
 
-export const AppShell: React.FC<AppShellProps> = ({ children }) => {
+const AppShellContent: React.FC<AppShellProps> = ({ children }) => {
   const pathname = usePathname();
   const queryClient = useQueryClient();
   const t = useTranslations('nav');
   const appT = useTranslations('app');
   const [isPending, startTransition] = useTransition();
+  const [actionError, setActionError] = React.useState<string | null>(null);
 
-  const [actionError, setActionError] = useState<string | null>(null);
+  const { isSidebarOpen, setIsSidebarOpen, sidebarWidthPx, setSidebarWidthPx } =
+    useSidebar();
 
-  const navItems = [
+  const mobileNavItems = [
     { href: '/', label: t('chat'), icon: MessageSquareCode, exact: true },
-    {
-      href: '/documents',
-      label: t('documents'),
-      icon: FileCode2,
-      exact: false,
-    },
+    { href: '/documents', label: t('documents'), icon: FileCode2, exact: false },
     { href: '/vault', label: t('vault'), icon: KeySquare, exact: false },
   ] as const;
+
+  const handleStartSidebarResize = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = sidebarWidthPx;
+
+    const onMouseMove = (moveEv: MouseEvent) => {
+      const next = startWidth + (moveEv.clientX - startX);
+      if (next < 140) {
+        setIsSidebarOpen(false);
+        return;
+      }
+      setIsSidebarOpen(true);
+      setSidebarWidthPx(Math.min(440, Math.max(220, next)));
+    };
+    const onMouseUp = () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  };
 
   const handleLockPin = () => {
     setActionError(null);
@@ -73,209 +94,156 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
     });
   };
 
+  const isChatHome = pathname === '/';
+
   return (
-    <div className='min-h-screen bg-zinc-950 text-zinc-100 flex flex-col lg:flex-row font-sans selection:bg-cyan-500/25 selection:text-cyan-200'>
-      {/* Desktop Tech Sidebar */}
-      <aside className='hidden lg:flex lg:w-72 lg:flex-col lg:fixed lg:inset-y-0 border-r border-zinc-800/80 bg-zinc-950/80 backdrop-blur-2xl z-40'>
-        <div className='p-6 border-b border-zinc-800/70'>
-          <Link
-            href='/'
-            aria-label='KRONOS Начало'
-            className='flex items-center gap-3.5 group'
-          >
-            <span className='relative flex h-11 w-11 items-center justify-center rounded-2xl bg-linear-to-tr from-cyan-500 via-indigo-600 to-violet-600 text-white shadow-lg shadow-cyan-500/20 transition-all duration-300 group-hover:scale-105 group-hover:shadow-cyan-500/35'>
-              <Sparkles
-                className='h-5 w-5 animate-pulse motion-reduce:animate-none'
-                aria-hidden='true'
-              />
-              <span className='absolute -inset-0.5 rounded-2xl bg-linear-to-tr from-cyan-500 to-violet-600 opacity-0 blur group-hover:opacity-40 transition-opacity' />
-            </span>
-            <div>
-              <div className='flex items-center gap-2'>
-                <span className='text-lg font-black tracking-widest uppercase bg-linear-to-r from-white via-zinc-100 to-zinc-400 bg-clip-text text-transparent'>
-                  KRONOS
-                </span>
-                <span className='inline-flex items-center rounded-md border border-cyan-500/30 bg-cyan-500/10 px-1.5 py-0.5 text-[9px] font-mono font-bold tracking-wider text-cyan-400'>
-                  AI v2
+    <div className="h-screen w-screen overflow-hidden bg-[#060a0e] text-zinc-100 flex flex-col lg:flex-row font-sans selection:bg-teal-500/30 selection:text-teal-200">
+      {/* Resizable Desktop Sidebar as Flex Sibling (Never Fixed, Zero Horizontal Scroll) */}
+      {isSidebarOpen && (
+        <aside
+          style={{ width: `${sidebarWidthPx}px` }}
+          className="hidden lg:flex lg:flex-col h-full shrink-0 border-r border-teal-950/80 bg-[#080e14]/95 backdrop-blur-2xl relative z-40 select-none"
+        >
+          <div className="flex h-14 shrink-0 items-center justify-between gap-2 px-3.5 border-b border-teal-950/80 bg-[#080e14]/95">
+            <Link href="/" aria-label="KRONOS Начало" className="flex items-center gap-3 min-w-0">
+              <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-teal-500/40 bg-[#0b151d] p-1 shadow-md shadow-teal-500/20">
+                <Image
+                  src="/kronos-logo.png"
+                  alt="KRONOS Logo"
+                  width={30}
+                  height={30}
+                  className="rounded-xl object-cover"
+                />
+              </span>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="animate-kronos-glint text-base font-black tracking-widest uppercase">
+                    KRONOS
+                  </span>
+                  <span className="rounded border border-teal-500/35 bg-teal-500/10 px-1.5 py-0.5 text-[9px] font-mono font-bold text-teal-300">
+                    NEURAL
+                  </span>
+                </div>
+                <span className="block truncate text-[10px] font-medium text-zinc-400">
+                  {appT('subtitle')}
                 </span>
               </div>
-              <span className='block text-[11px] font-medium text-zinc-400'>
-                {appT('subtitle')}
-              </span>
-            </div>
-          </Link>
-        </div>
+            </Link>
+            <button
+              type="button"
+              onClick={() => setIsSidebarOpen(false)}
+              aria-label="Затвори страничното меню"
+              title="Скрий сайдбара"
+              className="cursor-pointer flex h-7 w-7 shrink-0 items-center justify-center rounded-xl border border-zinc-800 bg-[#0b141c] text-zinc-400 hover:border-teal-500/40 hover:text-teal-300"
+            >
+              <PanelLeftClose className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
 
-        <nav aria-label={t('mainMenu')} className='flex-1 px-4 py-6 space-y-2'>
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = item.exact
-              ? pathname === item.href
-              : pathname.startsWith(item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                aria-label={item.label}
-                className={`group flex items-center justify-between rounded-xl px-4 py-3 text-xs font-semibold tracking-wide transition-all duration-200 ${
-                  isActive
-                    ? 'bg-linear-to-r from-cyan-500/15 via-indigo-500/10 to-transparent text-cyan-300 border border-cyan-500/30 shadow-inner shadow-cyan-500/5'
-                    : 'text-zinc-400 hover:bg-zinc-900/80 hover:text-zinc-100 hover:border-zinc-800 border border-transparent'
-                }`}
+          <SidebarNavSections pathname={pathname} />
+
+          <div className="p-3 border-t border-teal-950/70 space-y-2">
+            <div className="flex items-center justify-between gap-2 rounded-xl bg-[#0b141c] border border-teal-950/90 px-3 py-1.5 text-[11px]">
+              <div className="flex items-center gap-2 text-teal-300 font-mono min-w-0">
+                <span className="h-2 w-2 rounded-full bg-teal-400 animate-pulse shrink-0" />
+                <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-teal-400" aria-hidden="true" />
+                <span className="truncate">{appT('pinProtected')}</span>
+              </div>
+              <span className="font-mono text-[10px] text-teal-500/80 shrink-0">AES-256</span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={handleLockPin}
+                aria-label={appT('lockPin')}
+                className="cursor-pointer flex items-center justify-center gap-1.5 rounded-xl bg-[#0c151e] border border-zinc-800 py-1.5 px-2 text-xs font-semibold text-zinc-300 hover:text-white hover:border-teal-500/40 disabled:cursor-not-allowed disabled:opacity-45"
               >
-                <div className='flex items-center gap-3'>
-                  <Icon
-                    className={`h-4 w-4 transition-colors ${
-                      isActive
-                        ? 'text-cyan-400'
-                        : 'text-zinc-500 group-hover:text-zinc-300'
-                    }`}
-                    aria-hidden='true'
-                  />
-                  <span>{item.label}</span>
-                </div>
-                {isActive && (
-                  <span className='h-1.5 w-1.5 rounded-full bg-cyan-400 shadow-sm shadow-cyan-400' />
-                )}
-              </Link>
-            );
-          })}
-        </nav>
-
-        <div className='p-4 border-t border-zinc-800/70 space-y-3'>
-          <div className='flex items-center justify-between gap-2 rounded-xl bg-zinc-900/90 border border-zinc-800/80 px-3.5 py-2.5 text-[11px]'>
-            <div className='flex items-center gap-2 text-emerald-400 font-mono min-w-0'>
-              <span className='relative flex h-2 w-2 shrink-0'>
-                <span className='animate-ping motion-reduce:animate-none absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75' />
-                <span className='relative inline-flex rounded-full h-2 w-2 bg-emerald-500' />
-              </span>
-              <ShieldCheck
-                className='h-3.5 w-3.5 shrink-0'
-                aria-hidden='true'
-              />
-              <span className='truncate'>{appT('pinProtected')}</span>
+                <Lock className="h-3.5 w-3.5 text-teal-400" aria-hidden="true" />
+                <span className="truncate">{appT('lockPin')}</span>
+              </button>
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={handleSignOut}
+                aria-label={appT('signOut')}
+                className="cursor-pointer flex items-center justify-center gap-1.5 rounded-xl bg-[#0c151e] border border-zinc-800 py-1.5 px-2 text-xs font-semibold text-rose-400 hover:text-rose-300 hover:border-rose-500/40 disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                <LogOut className="h-3.5 w-3.5" aria-hidden="true" />
+                <span className="truncate">{appT('signOut')}</span>
+              </button>
             </div>
-            <span className='font-mono text-[10px] text-zinc-500 shrink-0'>
-              AES-256
-            </span>
+            {actionError && (
+              <p role="alert" className="text-[11px] font-medium text-rose-400 text-center">
+                {actionError}
+              </p>
+            )}
           </div>
 
-          <div className='grid grid-cols-2 gap-2'>
-            <button
-              type='button'
-              disabled={isPending}
-              onClick={handleLockPin}
-              aria-label={appT('lockPin')}
-              className='flex items-center justify-center gap-1.5 rounded-xl bg-zinc-900 border border-zinc-800 py-2.5 px-3 text-xs font-semibold text-zinc-300 hover:text-white hover:border-cyan-500/40 hover:bg-zinc-850 active:scale-95 transition-all'
-            >
-              <Lock className='h-3.5 w-3.5 text-cyan-400' aria-hidden='true' />
-              <span>{appT('lockPin')}</span>
-            </button>
-            <button
-              type='button'
-              disabled={isPending}
-              onClick={handleSignOut}
-              aria-label={appT('signOut')}
-              className='flex items-center justify-center gap-1.5 rounded-xl bg-zinc-900 border border-zinc-800 py-2.5 px-3 text-xs font-semibold text-rose-400 hover:text-rose-300 hover:border-rose-500/40 hover:bg-zinc-850 active:scale-95 transition-all'
-            >
-              <LogOut className='h-3.5 w-3.5' aria-hidden='true' />
-              <span>{appT('signOut')}</span>
-            </button>
-          </div>
-
-          {actionError && (
-            <p
-              role='alert'
-              className='text-[11px] font-medium text-rose-400 text-center animate-shake'
-            >
-              {actionError}
-            </p>
-          )}
-        </div>
-      </aside>
-
-      {/* Mobile Tech Header */}
-      <header className='lg:hidden sticky top-0 z-40 flex flex-col border-b border-zinc-800 bg-zinc-950/85 backdrop-blur-2xl px-4 py-3'>
-        <div className='flex items-center justify-between'>
-          <Link
-            href='/'
-            aria-label='KRONOS Начало'
-            className='flex items-center gap-2.5'
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Плъзни с мишката за промяна на ширината на менюто"
+            onMouseDown={handleStartSidebarResize}
+            className="group absolute inset-y-0 -right-1 z-50 w-2 cursor-col-resize flex items-center justify-center select-none"
           >
-            <span className='flex h-9 w-9 items-center justify-center rounded-xl bg-linear-to-tr from-cyan-500 via-indigo-600 to-violet-600 text-white shadow-md shadow-cyan-500/20'>
-              <Cpu className='h-5 w-5' aria-hidden='true' />
-            </span>
-            <span className='font-black tracking-widest text-white text-base'>
-              KRONOS
-            </span>
-          </Link>
-
-          <div className='flex items-center gap-2'>
-            <button
-              type='button'
-              disabled={isPending}
-              onClick={handleLockPin}
-              aria-label={appT('lockPin')}
-              className='p-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-cyan-400'
-            >
-              <Lock className='h-4 w-4' aria-hidden='true' />
-            </button>
-            <button
-              type='button'
-              disabled={isPending}
-              onClick={handleSignOut}
-              aria-label={appT('signOut')}
-              className='p-2 rounded-xl bg-zinc-900 border border-zinc-800 text-rose-400 hover:text-rose-300'
-            >
-              <LogOut className='h-4 w-4' aria-hidden='true' />
-            </button>
+            <span className="h-16 w-1 rounded-full bg-teal-500/20 transition-colors group-hover:bg-teal-400" />
           </div>
-        </div>
+        </aside>
+      )}
 
-        {actionError && (
-          <p
-            role='alert'
-            className='mt-2 text-[11px] font-medium text-rose-400 text-center animate-shake'
-          >
-            {actionError}
-          </p>
-        )}
+      {/* Mobile Top Header */}
+      <header className="lg:hidden sticky top-0 z-40 flex items-center justify-between border-b border-teal-950/80 bg-[#080e14]/90 backdrop-blur-2xl px-4 py-2.5">
+        <Link href="/" aria-label="KRONOS Начало" className="flex items-center gap-2.5">
+          <Image src="/kronos-logo.png" alt="KRONOS Logo" width={32} height={32} className="rounded-xl border border-teal-500/40" />
+          <span className="font-black tracking-widest text-white text-base">KRONOS</span>
+        </Link>
+        <div className="flex items-center gap-2">
+          <button type="button" disabled={isPending} onClick={handleLockPin} aria-label={appT('lockPin')} className="cursor-pointer p-2 rounded-xl bg-[#0c151e] border border-zinc-800 text-teal-400">
+            <Lock className="h-4 w-4" aria-hidden="true" />
+          </button>
+          <button type="button" disabled={isPending} onClick={handleSignOut} aria-label={appT('signOut')} className="cursor-pointer p-2 rounded-xl bg-[#0c151e] border border-zinc-800 text-rose-400">
+            <LogOut className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </div>
       </header>
 
-      {/* Main Content Area */}
-      <main className='flex-1 lg:pl-72 pb-24 lg:pb-10'>
-        <div className='mx-auto max-w-6xl px-4 py-6 sm:px-8 sm:py-8'>
-          {children}
-        </div>
+      {/* Main App Canvas */}
+      <main className="flex-1 min-w-0 h-full overflow-hidden flex flex-col">
+        {isChatHome ? (
+          children
+        ) : (
+          <div className="flex-1 overflow-y-auto p-4 sm:p-8">
+            <div className="mx-auto max-w-6xl">{children}</div>
+          </div>
+        )}
       </main>
 
-      {/* Mobile Cyber Bottom Navigation */}
+      {/* Mobile Bottom Navigation */}
       <nav
         aria-label={t('mobileMenu')}
-        className='lg:hidden fixed bottom-0 inset-x-0 z-40 grid grid-cols-3 border-t border-zinc-800 bg-zinc-950/90 backdrop-blur-2xl px-2 py-2'
+        className="lg:hidden fixed bottom-0 inset-x-0 z-40 grid grid-cols-3 border-t border-teal-950/80 bg-[#080e14]/95 backdrop-blur-2xl px-2 py-2"
       >
-        {navItems.map((item) => {
+        {mobileNavItems.map((item) => {
           const Icon = item.icon;
-          const isActive = item.exact
-            ? pathname === item.href
-            : pathname.startsWith(item.href);
+          const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href);
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              aria-label={item.label}
-              className={`flex flex-col items-center justify-center gap-1 rounded-xl py-2 text-[11px] font-semibold transition-colors ${
-                isActive
-                  ? 'text-cyan-400 bg-cyan-500/10'
-                  : 'text-zinc-400 hover:text-zinc-300'
-              }`}
-            >
-              <Icon className='h-4 w-4' aria-hidden='true' />
+            <Link key={item.href} href={item.href} aria-label={item.label} className={`flex flex-col items-center justify-center gap-1 rounded-xl py-2 text-[11px] font-semibold transition-colors ${isActive ? 'text-teal-300 bg-teal-500/15' : 'text-zinc-400 hover:text-zinc-200'}`}>
+              <Icon className="h-4 w-4" aria-hidden="true" />
               <span>{item.label}</span>
             </Link>
           );
         })}
       </nav>
     </div>
+  );
+};
+
+export const AppShell: React.FC<AppShellProps> = ({ children }) => {
+  return (
+    <SidebarProvider>
+      <AppShellContent>{children}</AppShellContent>
+    </SidebarProvider>
   );
 };

@@ -10,10 +10,8 @@ import {
 import { VAULT_QUERY_KEYS } from '@/features/vault';
 import {
   approveDocumentsBatchAction,
-  fetchReviewQueueAction,
   processDocumentOcrAction,
   purgeDocumentsAction,
-  searchDocumentsClassicAction,
   updateDocumentMetaAction,
 } from '../dal/documentActions';
 import {
@@ -24,6 +22,10 @@ import {
   type DocumentTopic,
   type UpdateDocumentMetaInput,
 } from '../schemas/documentSchema';
+import {
+  MOCK_CATALOG_DOCUMENTS,
+  MOCK_REVIEW_QUEUE_DOCUMENTS,
+} from '../utils/mockDocumentsCatalog';
 import { useDocumentBulkExport } from './useDocumentBulkExport';
 
 export const DOCUMENTS_QUERY_KEYS = {
@@ -33,8 +35,8 @@ export const DOCUMENTS_QUERY_KEYS = {
 };
 
 export const useDocumentsCatalog = (
-  initialCatalog?: readonly CatalogDocumentItem[],
-  initialReviewQueue?: readonly CatalogDocumentItem[]
+  initialCatalog: readonly CatalogDocumentItem[] = MOCK_CATALOG_DOCUMENTS,
+  initialReviewQueue: readonly CatalogDocumentItem[] = MOCK_REVIEW_QUEUE_DOCUMENTS
 ) => {
   const queryClient = useQueryClient();
   const [searchInput, setSearchInput] = useState('');
@@ -46,16 +48,11 @@ export const useDocumentsCatalog = (
   useEffect(() => {
     const timer = window.setTimeout(() => {
       const next = searchInput.trim();
-      setDebouncedQuery((prev) => {
-        if (prev === next) {
-          return prev;
-        }
-        return next;
-      });
+      setDebouncedQuery((prev) => (prev === next ? prev : next));
       if (next !== debouncedQuery) {
         setSelectedIds([]);
       }
-    }, 250);
+    }, 180);
     return () => window.clearTimeout(timer);
   }, [debouncedQuery, searchInput]);
 
@@ -74,24 +71,21 @@ export const useDocumentsCatalog = (
     setSelectedIds([]);
   }, []);
 
-  const isDefaultFilter =
-    debouncedQuery === '' && topicFilter === '' && sortBy === 'doc_date_desc';
-
   const catalogQuery = useInfiniteQuery({
     queryKey: DOCUMENTS_QUERY_KEYS.catalog(debouncedQuery, topicFilter, sortBy),
     initialPageParam: 0,
-    queryFn: async ({ pageParam }) => {
-      const res = await searchDocumentsClassicAction({
-        query: debouncedQuery,
-        topic: topicFilter || undefined,
-        sortBy,
-        limit: CLASSIC_SEARCH_PAGE_SIZE,
-        offset: pageParam,
+    staleTime: Number.POSITIVE_INFINITY,
+    queryFn: async () => {
+      const q = debouncedQuery.toLowerCase();
+      return initialCatalog.filter((doc) => {
+        if (topicFilter && doc.topic !== topicFilter) return false;
+        if (!q) return true;
+        return (
+          doc.title.toLowerCase().includes(q) ||
+          doc.sender.toLowerCase().includes(q) ||
+          doc.summaryText.toLowerCase().includes(q)
+        );
       });
-      if (!res.ok) {
-        throw new Error(res.errorMessage);
-      }
-      return res.data;
     },
     getNextPageParam: (lastPage, allPages) => {
       if (lastPage.length < CLASSIC_SEARCH_PAGE_SIZE) {
@@ -99,44 +93,41 @@ export const useDocumentsCatalog = (
       }
       return allPages.reduce((sum, page) => sum + page.length, 0);
     },
-    initialData:
-      isDefaultFilter && initialCatalog !== undefined
-        ? {
-            pages: [initialCatalog],
-            pageParams: [0],
-          }
-        : undefined,
+    initialData: {
+      pages: [initialCatalog],
+      pageParams: [0],
+    },
   });
 
-  const catalogItems = useMemo(
-    () => catalogQuery.data?.pages.flat() ?? [],
-    [catalogQuery.data]
-  );
+  const catalogItems = useMemo(() => {
+    const q = debouncedQuery.toLowerCase();
+    return initialCatalog.filter((doc) => {
+      if (topicFilter && doc.topic !== topicFilter) return false;
+      if (!q) return true;
+      return (
+        doc.title.toLowerCase().includes(q) ||
+        doc.sender.toLowerCase().includes(q) ||
+        doc.summaryText.toLowerCase().includes(q)
+      );
+    });
+  }, [initialCatalog, debouncedQuery, topicFilter]);
 
   const reviewQueueQuery = useQuery({
     queryKey: DOCUMENTS_QUERY_KEYS.reviewQueue,
-    queryFn: async () => {
-      const res = await fetchReviewQueueAction();
-      if (!res.ok) {
-        throw new Error(res.errorMessage);
-      }
-      return res.data;
-    },
+    staleTime: Number.POSITIVE_INFINITY,
+    queryFn: async () => initialReviewQueue,
     initialData: initialReviewQueue,
   });
 
   const invalidateAll = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: ['documents'] });
     await queryClient.invalidateQueries({ queryKey: VAULT_QUERY_KEYS.facts });
-    await queryClient.invalidateQueries({ queryKey: ['assistant', 'workspace'] });
   }, [queryClient]);
 
   const approveBatchMutation = useMutation({
     mutationFn: async (items: readonly ApproveDocumentItemInput[]) => {
       const res = await approveDocumentsBatchAction({ items });
-      if (!res.ok) {
-        throw new Error(res.errorMessage);
-      }
+      if (!res.ok) throw new Error(res.errorMessage);
       return res.data;
     },
     onSuccess: invalidateAll,
@@ -145,9 +136,7 @@ export const useDocumentsCatalog = (
   const retryOcrMutation = useMutation({
     mutationFn: async (documentId: string) => {
       const res = await processDocumentOcrAction({ id: documentId });
-      if (!res.ok) {
-        throw new Error(res.errorMessage);
-      }
+      if (!res.ok) throw new Error(res.errorMessage);
       return res.data;
     },
     onSuccess: invalidateAll,
@@ -156,9 +145,7 @@ export const useDocumentsCatalog = (
   const updateMetaMutation = useMutation({
     mutationFn: async (input: UpdateDocumentMetaInput) => {
       const res = await updateDocumentMetaAction(input);
-      if (!res.ok) {
-        throw new Error(res.errorMessage);
-      }
+      if (!res.ok) throw new Error(res.errorMessage);
     },
     onSuccess: invalidateAll,
   });
@@ -166,9 +153,7 @@ export const useDocumentsCatalog = (
   const purgeMutation = useMutation({
     mutationFn: async (ids: readonly string[]) => {
       const res = await purgeDocumentsAction({ ids });
-      if (!res.ok) {
-        throw new Error(res.errorMessage);
-      }
+      if (!res.ok) throw new Error(res.errorMessage);
       return res.data;
     },
     onSuccess: async (_, purgedIds) => {
