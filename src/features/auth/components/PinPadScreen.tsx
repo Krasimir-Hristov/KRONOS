@@ -1,15 +1,9 @@
 'use client';
 
-import React, { useEffect, useState, useTransition } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Delete, KeyRound, Lock, RotateCcw, ShieldAlert } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import {
-  setupOrVerifyPinAction,
-  signOutAction,
-  verifyStepUpPinAction,
-} from '../dal/authActions';
 
 interface PinPadScreenProps {
   readonly initialHasPin?: boolean;
@@ -22,17 +16,16 @@ export const PinPadScreen: React.FC<PinPadScreenProps> = ({
   isStepUp = false,
   onSuccess,
 }) => {
-  const router = useRouter();
   const queryClient = useQueryClient();
   const t = useTranslations('auth');
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [isConfirmingSetup, setIsConfirmingSetup] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleDigit = (digit: string) => {
-    if (isPending) return;
+    if (isSubmitting) return;
     setErrorMessage(null);
 
     if (!initialHasPin && !isStepUp) {
@@ -45,7 +38,7 @@ export const PinPadScreen: React.FC<PinPadScreenProps> = ({
       } else if (confirmPin.length < 4) {
         const next = confirmPin + digit;
         setConfirmPin(next);
-        if (next.length === 4) triggerSetup(pin, next);
+        if (next.length === 4) void triggerSetup(pin, next);
       }
       return;
     }
@@ -53,12 +46,12 @@ export const PinPadScreen: React.FC<PinPadScreenProps> = ({
     if (pin.length < 4) {
       const next = pin + digit;
       setPin(next);
-      if (next.length === 4) triggerVerify(next);
+      if (next.length === 4) void triggerVerify(next);
     }
   };
 
   const handleDelete = () => {
-    if (isPending) return;
+    if (isSubmitting) return;
     setErrorMessage(null);
     if (!initialHasPin && !isStepUp && isConfirmingSetup) {
       if (confirmPin.length > 0) {
@@ -73,59 +66,96 @@ export const PinPadScreen: React.FC<PinPadScreenProps> = ({
   };
 
   const handleClear = () => {
-    if (isPending) return;
+    if (isSubmitting) return;
     setPin('');
     setConfirmPin('');
     setIsConfirmingSetup(false);
     setErrorMessage(null);
   };
 
-  const handleSwitchAccount = () => {
-    startTransition(async () => {
-      queryClient.clear();
-      await signOutAction();
-    });
+  const handleSwitchAccount = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    queryClient.clear();
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch {
+      // ignore
+    }
+    window.location.replace('/login');
   };
 
-  const triggerVerify = (code: string) => {
-    startTransition(async () => {
-      const result = isStepUp
-        ? await verifyStepUpPinAction({ pin: code })
-        : await setupOrVerifyPinAction({ pin: code });
+  const triggerVerify = async (code: string) => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
 
-      if (!result.ok) {
-        setErrorMessage(result.errorMessage);
+    try {
+      const res = await fetch('/api/auth/pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin: code, isStepUp }),
+      });
+
+      const result = (await res.json()) as {
+        readonly ok?: boolean;
+        readonly errorMessage?: string;
+        readonly data?: { readonly expiresAtMs?: number };
+      };
+
+      if (!res.ok || !result.ok) {
+        setErrorMessage(result.errorMessage ?? t('invalidPin'));
         setPin('');
+        setIsSubmitting(false);
         return;
       }
 
-      if (onSuccess) {
+      if (isStepUp && onSuccess) {
         onSuccess();
-      } else {
-        router.push('/');
-        router.refresh();
+        setIsSubmitting(false);
+        return;
       }
-    });
+
+      window.location.replace('/');
+    } catch {
+      setErrorMessage(t('networkError'));
+      setPin('');
+      setIsSubmitting(false);
+    }
   };
 
-  const triggerSetup = (firstPin: string, secondPin: string) => {
-    startTransition(async () => {
-      const result = await setupOrVerifyPinAction({
-        pin: firstPin,
-        confirmPin: secondPin,
+  const triggerSetup = async (firstPin: string, secondPin: string) => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+
+    try {
+      const res = await fetch('/api/auth/pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin: firstPin, confirmPin: secondPin }),
       });
 
-      if (!result.ok) {
-        setErrorMessage(result.errorMessage);
+      const result = (await res.json()) as {
+        readonly ok?: boolean;
+        readonly errorMessage?: string;
+      };
+
+      if (!res.ok || !result.ok) {
+        setErrorMessage(result.errorMessage ?? t('invalidPin'));
         setPin('');
         setConfirmPin('');
         setIsConfirmingSetup(false);
+        setIsSubmitting(false);
         return;
       }
 
-      router.push('/');
-      router.refresh();
-    });
+      window.location.replace('/');
+    } catch {
+      setErrorMessage(t('networkError'));
+      setPin('');
+      setConfirmPin('');
+      setIsConfirmingSetup(false);
+      setIsSubmitting(false);
+    }
   };
 
   useEffect(() => {
@@ -165,7 +195,10 @@ export const PinPadScreen: React.FC<PinPadScreenProps> = ({
           {isStepUp ? (
             <KeyRound className="h-6 w-6" aria-hidden="true" />
           ) : (
-            <Lock className="h-6 w-6" aria-hidden="true" />
+            <Lock
+              className={`h-6 w-6 transition-transform duration-300 ${isSubmitting ? 'scale-110 animate-pulse text-cyan-300' : ''}`}
+              aria-hidden="true"
+            />
           )}
         </div>
 
@@ -203,17 +236,15 @@ export const PinPadScreen: React.FC<PinPadScreenProps> = ({
             <button
               key={digit}
               type="button"
-              disabled={isPending}
+              disabled={isSubmitting}
               aria-label={t('pinDigitLabel', { digit })}
               onClick={() => handleDigit(digit)}
               className="h-13 rounded-2xl bg-zinc-900/90 border border-zinc-800 text-lg font-mono font-bold text-white hover:bg-zinc-800 hover:border-cyan-500/40 hover:text-cyan-300 active:scale-95 disabled:opacity-50 transition-all shadow-xs"
-            >
-              {digit}
-            </button>
+            >{digit}</button>
           ))}
           <button
             type="button"
-            disabled={isPending}
+            disabled={isSubmitting}
             aria-label={t('pinClearAll')}
             onClick={handleClear}
             className="h-13 rounded-2xl bg-zinc-900/40 border border-zinc-850 text-zinc-500 flex items-center justify-center hover:text-zinc-200 hover:bg-zinc-850 active:scale-95 transition-all"
@@ -222,16 +253,14 @@ export const PinPadScreen: React.FC<PinPadScreenProps> = ({
           </button>
           <button
             type="button"
-            disabled={isPending}
+            disabled={isSubmitting}
             aria-label={t('pinDigitLabel', { digit: '0' })}
             onClick={() => handleDigit('0')}
             className="h-13 rounded-2xl bg-zinc-900/90 border border-zinc-800 text-lg font-mono font-bold text-white hover:bg-zinc-800 hover:border-cyan-500/40 hover:text-cyan-300 active:scale-95 disabled:opacity-50 transition-all shadow-xs"
-          >
-            0
-          </button>
+          >0</button>
           <button
             type="button"
-            disabled={isPending}
+            disabled={isSubmitting}
             aria-label={t('pinDeleteDigit')}
             onClick={handleDelete}
             className="h-13 rounded-2xl bg-zinc-900/40 border border-zinc-850 text-zinc-500 flex items-center justify-center hover:text-zinc-200 hover:bg-zinc-850 active:scale-95 transition-all"
@@ -244,7 +273,7 @@ export const PinPadScreen: React.FC<PinPadScreenProps> = ({
           <div className="mt-6 pt-4 border-t border-zinc-800/80 flex justify-center">
             <button
               type="button"
-              disabled={isPending}
+              disabled={isSubmitting}
               onClick={handleSwitchAccount}
               aria-label={t('switchAccountAria')}
               className="text-xs font-mono text-zinc-400 hover:text-cyan-400 disabled:opacity-50 transition-colors"

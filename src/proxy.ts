@@ -35,6 +35,7 @@ const isPublicRoute = (pathname: string): boolean => {
   if (
     pathname === '/login' ||
     pathname.startsWith('/auth/') ||
+    pathname.startsWith('/api/auth/') ||
     pathname.startsWith('/api/cron/') ||
     pathname === '/favicon.ico' ||
     pathname === '/icon' ||
@@ -89,6 +90,15 @@ export const proxy = async (request: NextRequest): Promise<NextResponse> => {
     const {
       data: { user },
     } = await supabase.auth.getUser();
+
+    // Server Actions and POST/mutation requests must never be redirected at the proxy boundary
+    // to prevent aborting Next.js internal action RPC pipelines. Defense in depth is enforced
+    // inside the actions themselves via requireAuthAndPin().
+    const isActionOrMutation =
+      request.method !== 'GET' && request.method !== 'HEAD';
+    if (isActionOrMutation || request.headers.has('next-action')) {
+      return response;
+    }
 
     // 1. Unauthenticated users can only visit /login
     if (!user) {

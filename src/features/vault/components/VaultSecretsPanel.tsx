@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react';
 import { Check, Copy, Eye, EyeOff, LockKeyhole, Pencil, ShieldCheck, Trash2 } from 'lucide-react';
-import { verifyStepUpPinAction } from '@/features/auth';
 import type { VaultSecretMaskedItem } from '../schemas/vaultSchema';
 import { CATEGORY_LABELS_BG } from './VaultItemModal';
 
@@ -43,14 +42,23 @@ export const VaultSecretsPanel: React.FC<VaultSecretsPanelProps> = ({
     setIsVerifyingPin(true);
     setPinError(null);
     try {
-      const res = await verifyStepUpPinAction({ pin: digits });
-      if (!res.ok) {
+      const res = await fetch('/api/auth/pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin: digits, isStepUp: true }),
+      });
+      const data = (await res.json()) as {
+        readonly ok?: boolean;
+        readonly errorMessage?: string;
+        readonly data?: { readonly expiresAtMs?: number };
+      };
+      if (!res.ok || !data.ok) {
         setPinInput('');
-        setPinError(res.errorMessage);
+        setPinError(data.errorMessage ?? 'Невалиден ПИН код за отключване.');
         return;
       }
       setPinInput('');
-      onUnlocked(res.data?.expiresAtMs ?? Date.now() + DEFAULT_STEP_UP_TTL_MS);
+      onUnlocked(data.data?.expiresAtMs ?? Date.now() + DEFAULT_STEP_UP_TTL_MS);
     } catch {
       setPinInput('');
       setPinError('Грешка при проверка на 4-цифрения ПИН код.');

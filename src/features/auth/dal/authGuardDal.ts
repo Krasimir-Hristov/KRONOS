@@ -1,4 +1,5 @@
 import 'server-only';
+import { cache } from 'react';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { getCryptoSecrets } from '@/config/envConfig';
@@ -21,7 +22,7 @@ export interface UserPinStatus {
   readonly errorCode?: PinStatusErrorCode;
 }
 
-export const getUserPinStatus = async (userId: string): Promise<UserPinStatus> => {
+export const getUserPinStatus = cache(async (userId: string): Promise<UserPinStatus> => {
   try {
     const supabase = await createServerSupabaseClient();
     const { data: profile, error } = await supabase
@@ -49,11 +50,9 @@ export const getUserPinStatus = async (userId: string): Promise<UserPinStatus> =
       errorCode: 'UNEXPECTED_ERROR',
     };
   }
-};
+});
 
-export const requireAuthAndPin = async (
-  options: { readonly redirectOnFail?: boolean } = { redirectOnFail: true }
-): Promise<VerifiedAuthContext> => {
+const fetchVerifiedUserAndProfile = cache(async () => {
   const supabase = await createServerSupabaseClient();
   const {
     data: { user },
@@ -61,10 +60,7 @@ export const requireAuthAndPin = async (
   } = await supabase.auth.getUser();
 
   if (userError || !user) {
-    if (options.redirectOnFail) {
-      redirect('/login');
-    }
-    throw new Error('Неоторизиран достъп. Моля, влезте в системата.');
+    return { user: null, profile: null };
   }
 
   const { data: profile } = await supabase
@@ -73,11 +69,23 @@ export const requireAuthAndPin = async (
     .eq('id', user.id)
     .single();
 
-  if (!profile) {
+  return { user, profile: profile ?? null };
+});
+
+export const requireAuthAndPin = async (
+  options: { readonly redirectOnFail?: boolean } = { redirectOnFail: true }
+): Promise<VerifiedAuthContext> => {
+  const { user, profile } = await fetchVerifiedUserAndProfile();
+
+  if (!user || !profile) {
     if (options.redirectOnFail) {
       redirect('/login');
     }
-    throw new Error('Липсва потребителски профил.');
+    throw new Error(
+      !user
+        ? 'Неоторизиран достъп. Моля, влезте в системата.'
+        : 'Липсва потребителски профил.'
+    );
   }
 
   const cookieStore = await cookies();

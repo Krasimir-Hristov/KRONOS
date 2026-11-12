@@ -47,19 +47,15 @@ export const signInAction = async (
       return { ok: false, errorMessage: 'Грешен имейл или парола.' };
     }
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('pin_hash')
-      .eq('id', authData.user.id)
-      .single();
-
-    return { ok: true, data: { hasPin: Boolean(profile?.pin_hash) } };
+    return { ok: true };
   } catch {
     return { ok: false, errorMessage: 'Неочаквана грешка при вход в системата.' };
   }
 };
 
-export const setupOrVerifyPinAction = async (input: unknown): Promise<ActionResponse> => {
+export const setupOrVerifyPinAction = async (
+  input: unknown
+): Promise<ActionResponse> => {
   try {
     const supabase = await createServerSupabaseClient();
     const {

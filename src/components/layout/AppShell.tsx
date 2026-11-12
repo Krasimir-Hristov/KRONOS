@@ -15,7 +15,6 @@ import {
 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
-import { lockPinAction, signOutAction } from '@/features/auth';
 
 interface AppShellProps {
   readonly children: React.ReactNode;
@@ -36,14 +35,24 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
 
   const handleLockPin = () => {
     startTransition(async () => {
-      await lockPinAction();
+      try {
+        await fetch('/api/auth/lock', { method: 'POST' });
+      } catch {
+        // ignore
+      }
+      window.location.replace('/pin');
     });
   };
 
   const handleSignOut = () => {
     startTransition(async () => {
       queryClient.clear();
-      await signOutAction();
+      try {
+        await fetch('/api/auth/logout', { method: 'POST' });
+      } catch {
+        // ignore
+      }
+      window.location.replace('/login');
     });
   };
 
