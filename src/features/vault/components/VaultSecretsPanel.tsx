@@ -2,11 +2,9 @@
 
 import React, { useState } from 'react';
 import { Check, Copy, Eye, EyeOff, LockKeyhole, Pencil, ShieldCheck, Trash2 } from 'lucide-react';
-import { verifyStepUpPinAction } from '@/features/auth';
 import type { VaultSecretMaskedItem } from '../schemas/vaultSchema';
+import { useStepUpPin } from '../hooks/useStepUpPin';
 import { CATEGORY_LABELS_BG } from './VaultItemModal';
-
-const DEFAULT_STEP_UP_TTL_MS = 5 * 60 * 1000;
 
 interface VaultSecretsPanelProps {
   readonly isStepUpUnlocked: boolean;
@@ -33,39 +31,14 @@ export const VaultSecretsPanel: React.FC<VaultSecretsPanelProps> = ({
   onEdit,
   onDelete,
 }) => {
-  const [pinInput, setPinInput] = useState('');
-  const [pinError, setPinError] = useState<string | null>(null);
-  const [isVerifyingPin, setIsVerifyingPin] = useState(false);
+  const {
+    pinInput,
+    pinError,
+    isVerifyingPin,
+    handlePinChange,
+  } = useStepUpPin({ onUnlocked });
   const [revealedMap, setRevealedMap] = useState<Record<string, string>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
-
-  const submitStepUpPin = async (digits: string) => {
-    setIsVerifyingPin(true);
-    setPinError(null);
-    try {
-      const res = await verifyStepUpPinAction({ pin: digits });
-      if (!res.ok) {
-        setPinInput('');
-        setPinError(res.errorMessage);
-        return;
-      }
-      setPinInput('');
-      onUnlocked(res.data?.expiresAtMs ?? Date.now() + DEFAULT_STEP_UP_TTL_MS);
-    } catch {
-      setPinInput('');
-      setPinError('Грешка при проверка на 4-цифрения ПИН код.');
-    } finally {
-      setIsVerifyingPin(false);
-    }
-  };
-
-  const handlePinChange = (rawVal: string) => {
-    const clean = rawVal.replace(/\D/g, '').slice(0, 4);
-    setPinInput(clean);
-    if (clean.length === 4) {
-      void submitStepUpPin(clean);
-    }
-  };
 
   const handleToggleReveal = async (id: string) => {
     if (revealedMap[id]) {

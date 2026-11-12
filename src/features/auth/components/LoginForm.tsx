@@ -1,37 +1,46 @@
 'use client';
 
-import React, { useState, useTransition } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState } from 'react';
 import { ArrowRight, Cpu, Lock, Mail, ShieldAlert, Sparkles } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { signInAction } from '../dal/authActions';
+import { authApiResponseSchema } from '../schemas/authSchema';
 
 export const LoginForm: React.FC = () => {
-  const router = useRouter();
   const t = useTranslations('auth');
   const appT = useTranslations('app');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     setErrorMessage(null);
+    setIsSubmitting(true);
 
-    startTransition(async () => {
-      try {
-        const result = await signInAction({ email, password });
-        if (!result.ok) {
-          setErrorMessage(result.errorMessage);
-          return;
-        }
-        router.push('/pin');
-        router.refresh();
-      } catch {
-        setErrorMessage(t('networkError'));
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const rawJson: unknown = await res.json().catch(() => null);
+      const parsed = authApiResponseSchema.safeParse(rawJson);
+
+      if (!res.ok || !parsed.success || !parsed.data.ok) {
+        const errorMsg = parsed.success ? parsed.data.errorMessage : null;
+        setErrorMessage(errorMsg ?? t('invalidCredentials'));
+        setIsSubmitting(false);
+        return;
       }
-    });
+
+      window.location.replace('/pin');
+    } catch {
+      setErrorMessage(t('networkError'));
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -124,11 +133,11 @@ export const LoginForm: React.FC = () => {
 
           <button
             type="submit"
-            disabled={isPending}
-            aria-label={isPending ? t('loggingIn') : t('loginButton')}
+            disabled={isSubmitting}
+            aria-label={isSubmitting ? t('loggingIn') : t('loginButton')}
             className="w-full mt-3 inline-flex items-center justify-center gap-2 rounded-xl bg-linear-to-r from-cyan-500 via-indigo-600 to-violet-600 py-3.5 px-4 text-xs font-bold tracking-wider uppercase text-white shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40 hover:brightness-110 active:scale-[0.98] disabled:opacity-50 transition-all"
           >
-            <span>{isPending ? t('loggingIn') : t('loginButton')}</span>
+            <span>{isSubmitting ? t('loggingIn') : t('loginButton')}</span>
             <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </button>
         </form>

@@ -1,15 +1,9 @@
 'use client';
 
-import React, { useEffect, useState, useTransition } from 'react';
-import { useRouter } from 'next/navigation';
-import { useQueryClient } from '@tanstack/react-query';
+import React, { useEffect, useState } from 'react';
 import { Delete, KeyRound, Lock, RotateCcw, ShieldAlert } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import {
-  setupOrVerifyPinAction,
-  signOutAction,
-  verifyStepUpPinAction,
-} from '../dal/authActions';
+import { usePinAuth } from '../hooks/usePinAuth';
 
 interface PinPadScreenProps {
   readonly initialHasPin?: boolean;
@@ -22,17 +16,31 @@ export const PinPadScreen: React.FC<PinPadScreenProps> = ({
   isStepUp = false,
   onSuccess,
 }) => {
-  const router = useRouter();
-  const queryClient = useQueryClient();
   const t = useTranslations('auth');
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [isConfirmingSetup, setIsConfirmingSetup] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
+
+  const {
+    isSubmitting,
+    errorMessage,
+    setErrorMessage,
+    handleSwitchAccount,
+    triggerVerify,
+    triggerSetup,
+  } = usePinAuth({
+    isStepUp,
+    onSuccess,
+    onClearPin: () => setPin(''),
+    onClearSetup: () => {
+      setPin('');
+      setConfirmPin('');
+      setIsConfirmingSetup(false);
+    },
+  });
 
   const handleDigit = (digit: string) => {
-    if (isPending) return;
+    if (isSubmitting) return;
     setErrorMessage(null);
 
     if (!initialHasPin && !isStepUp) {
@@ -45,7 +53,7 @@ export const PinPadScreen: React.FC<PinPadScreenProps> = ({
       } else if (confirmPin.length < 4) {
         const next = confirmPin + digit;
         setConfirmPin(next);
-        if (next.length === 4) triggerSetup(pin, next);
+        if (next.length === 4) void triggerSetup(pin, next);
       }
       return;
     }
@@ -53,12 +61,12 @@ export const PinPadScreen: React.FC<PinPadScreenProps> = ({
     if (pin.length < 4) {
       const next = pin + digit;
       setPin(next);
-      if (next.length === 4) triggerVerify(next);
+      if (next.length === 4) void triggerVerify(next);
     }
   };
 
   const handleDelete = () => {
-    if (isPending) return;
+    if (isSubmitting) return;
     setErrorMessage(null);
     if (!initialHasPin && !isStepUp && isConfirmingSetup) {
       if (confirmPin.length > 0) {
@@ -73,72 +81,25 @@ export const PinPadScreen: React.FC<PinPadScreenProps> = ({
   };
 
   const handleClear = () => {
-    if (isPending) return;
+    if (isSubmitting) return;
     setPin('');
     setConfirmPin('');
     setIsConfirmingSetup(false);
     setErrorMessage(null);
   };
 
-  const handleSwitchAccount = () => {
-    startTransition(async () => {
-      queryClient.clear();
-      await signOutAction();
-    });
-  };
-
-  const triggerVerify = (code: string) => {
-    startTransition(async () => {
-      const result = isStepUp
-        ? await verifyStepUpPinAction({ pin: code })
-        : await setupOrVerifyPinAction({ pin: code });
-
-      if (!result.ok) {
-        setErrorMessage(result.errorMessage);
-        setPin('');
-        return;
-      }
-
-      if (onSuccess) {
-        onSuccess();
-      } else {
-        router.push('/');
-        router.refresh();
-      }
-    });
-  };
-
-  const triggerSetup = (firstPin: string, secondPin: string) => {
-    startTransition(async () => {
-      const result = await setupOrVerifyPinAction({
-        pin: firstPin,
-        confirmPin: secondPin,
-      });
-
-      if (!result.ok) {
-        setErrorMessage(result.errorMessage);
-        setPin('');
-        setConfirmPin('');
-        setIsConfirmingSetup(false);
-        return;
-      }
-
-      router.push('/');
-      router.refresh();
-    });
-  };
-
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (/^[0-9]$/.test(e.key)) handleDigit(e.key);
-      else if (e.key === 'Backspace') handleDelete();
-      else if (e.key === 'Escape') handleClear();
+      if (e.key === 'Backspace') handleDelete();
+      if (e.key === 'Escape') handleClear();
     };
+
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   });
 
-  const activeInput = !initialHasPin && !isStepUp && isConfirmingSetup ? confirmPin : pin;
+  const activeInput = isConfirmingSetup ? confirmPin : pin;
 
   const headingText = isStepUp
     ? t('stepUpTitle')
@@ -165,7 +126,10 @@ export const PinPadScreen: React.FC<PinPadScreenProps> = ({
           {isStepUp ? (
             <KeyRound className="h-6 w-6" aria-hidden="true" />
           ) : (
-            <Lock className="h-6 w-6" aria-hidden="true" />
+            <Lock
+              className={`h-6 w-6 transition-transform duration-300 ${isSubmitting ? 'scale-110 animate-pulse text-cyan-300' : ''}`}
+              aria-hidden="true"
+            />
           )}
         </div>
 
@@ -183,19 +147,16 @@ export const PinPadScreen: React.FC<PinPadScreenProps> = ({
         )}
 
         <div className="flex justify-center gap-4 my-6" aria-label={t('pinDotsLabel')}>
-          {[0, 1, 2, 3].map((index) => {
-            const isFilled = index < activeInput.length;
-            return (
-              <span
-                key={index}
-                className={`h-3.5 w-3.5 rounded-full transition-all duration-200 ${
-                  isFilled
-                    ? 'scale-125 bg-cyan-400 shadow-md shadow-cyan-400/80 ring-2 ring-cyan-400/30'
-                    : 'bg-zinc-800 border border-zinc-700'
-                }`}
-              />
-            );
-          })}
+          {[0, 1, 2, 3].map((index) => (
+            <span
+              key={index}
+              className={`h-3.5 w-3.5 rounded-full transition-all duration-200 ${
+                index < activeInput.length
+                  ? 'scale-125 bg-cyan-400 shadow-md shadow-cyan-400/80 ring-2 ring-cyan-400/30'
+                  : 'bg-zinc-800 border border-zinc-700'
+              }`}
+            />
+          ))}
         </div>
 
         <div className="grid grid-cols-3 gap-2.5">
@@ -203,48 +164,40 @@ export const PinPadScreen: React.FC<PinPadScreenProps> = ({
             <button
               key={digit}
               type="button"
-              disabled={isPending}
+              disabled={isSubmitting}
               aria-label={t('pinDigitLabel', { digit })}
               onClick={() => handleDigit(digit)}
               className="h-13 rounded-2xl bg-zinc-900/90 border border-zinc-800 text-lg font-mono font-bold text-white hover:bg-zinc-800 hover:border-cyan-500/40 hover:text-cyan-300 active:scale-95 disabled:opacity-50 transition-all shadow-xs"
-            >
-              {digit}
-            </button>
+            >{digit}</button>
           ))}
           <button
             type="button"
-            disabled={isPending}
+            disabled={isSubmitting}
             aria-label={t('pinClearAll')}
             onClick={handleClear}
             className="h-13 rounded-2xl bg-zinc-900/40 border border-zinc-850 text-zinc-500 flex items-center justify-center hover:text-zinc-200 hover:bg-zinc-850 active:scale-95 transition-all"
-          >
-            <RotateCcw className="h-4 w-4" aria-hidden="true" />
-          </button>
+          ><RotateCcw className="h-4 w-4" aria-hidden="true" /></button>
           <button
             type="button"
-            disabled={isPending}
+            disabled={isSubmitting}
             aria-label={t('pinDigitLabel', { digit: '0' })}
             onClick={() => handleDigit('0')}
             className="h-13 rounded-2xl bg-zinc-900/90 border border-zinc-800 text-lg font-mono font-bold text-white hover:bg-zinc-800 hover:border-cyan-500/40 hover:text-cyan-300 active:scale-95 disabled:opacity-50 transition-all shadow-xs"
-          >
-            0
-          </button>
+          >0</button>
           <button
             type="button"
-            disabled={isPending}
+            disabled={isSubmitting}
             aria-label={t('pinDeleteDigit')}
             onClick={handleDelete}
             className="h-13 rounded-2xl bg-zinc-900/40 border border-zinc-850 text-zinc-500 flex items-center justify-center hover:text-zinc-200 hover:bg-zinc-850 active:scale-95 transition-all"
-          >
-            <Delete className="h-4 w-4" aria-hidden="true" />
-          </button>
+          ><Delete className="h-4 w-4" aria-hidden="true" /></button>
         </div>
 
         {!isStepUp && (
           <div className="mt-6 pt-4 border-t border-zinc-800/80 flex justify-center">
             <button
               type="button"
-              disabled={isPending}
+              disabled={isSubmitting}
               onClick={handleSwitchAccount}
               aria-label={t('switchAccountAria')}
               className="text-xs font-mono text-zinc-400 hover:text-cyan-400 disabled:opacity-50 transition-colors"
