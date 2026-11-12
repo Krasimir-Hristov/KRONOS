@@ -3,7 +3,11 @@ import { NextResponse } from 'next/server';
 import { getCryptoSecrets } from '@/config/envConfig';
 import { PIN_COOKIE_NAME, STEP_UP_PIN_COOKIE_NAME } from '@/proxy';
 import { createServerSupabaseClient } from '@/lib/supabase/supabaseServer';
-import { pinSchema, pinSetupSchema } from '@/features/auth';
+import {
+  pinApiRequestSchema,
+  pinSchema,
+  pinSetupSchema,
+} from '@/features/auth';
 import {
   createEncryptedPinCookie,
   hashPin,
@@ -15,14 +19,18 @@ const STEP_UP_TTL_MINUTES = 5;
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MINUTES = 15;
 
-interface PinRequestBody {
-  readonly pin?: string;
-  readonly confirmPin?: string;
-  readonly isStepUp?: boolean;
-}
-
 export const POST = async (request: Request): Promise<NextResponse> => {
   try {
+    const rawBody: unknown = await request.json().catch(() => null);
+    const parsedBody = pinApiRequestSchema.safeParse(rawBody);
+    if (!parsedBody.success) {
+      return NextResponse.json(
+        { ok: false, errorMessage: 'Невалидни данни в заявката.' },
+        { status: 400 }
+      );
+    }
+    const body = parsedBody.data;
+
     const supabase = await createServerSupabaseClient();
     const {
       data: { user },
@@ -48,54 +56,10 @@ export const POST = async (request: Request): Promise<NextResponse> => {
       );
     }
 
-    const body = (await request.json()) as PinRequestBody;
     const { pinSecret } = getCryptoSecrets();
     const cookieStore = await cookies();
 
-    // 1. Step-Up Verification Flow (Vault pass unlocking)
-    if (body.isStepUp) {
-      if (!profile.pin_hash) {
-        return NextResponse.json(
-          { ok: false, errorMessage: 'Липсва конфигуриран ПИН.' },
-          { status: 400 }
-        );
-      }
-
-      const parsed = pinSchema.safeParse(body);
-      if (!parsed.success) {
-        return NextResponse.json(
-          { ok: false, errorMessage: 'ПИН кодът трябва да съдържа точно 4 цифри.' },
-          { status: 400 }
-        );
-      }
-
-      if (!verifyPinHash(parsed.data.pin, profile.pin_hash)) {
-        return NextResponse.json(
-          { ok: false, errorMessage: 'Невалиден ПИН код за отключване на пароли.' },
-          { status: 400 }
-        );
-      }
-
-      const expiresAtMs = Date.now() + STEP_UP_TTL_MINUTES * 60 * 1000;
-      const stepUpCookie = createEncryptedPinCookie(
-        user.id,
-        STEP_UP_TTL_MINUTES,
-        pinSecret,
-        'step_up'
-      );
-
-      cookieStore.set(STEP_UP_PIN_COOKIE_NAME, stepUpCookie, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        path: '/',
-        maxAge: STEP_UP_TTL_MINUTES * 60,
-      });
-
-      return NextResponse.json({ ok: true, data: { expiresAtMs } });
-    }
-
-    // 2. Initial PIN Setup Flow (When user doesn't have a PIN yet)
+    // 1. Initial PIN Setup Flow (When user doesn't have a PIN yet)
     if (!profile.pin_hash) {
       const parsedSetup = pinSetupSchema.safeParse(body);
       if (!parsedSetup.success) {
@@ -142,7 +106,7 @@ export const POST = async (request: Request): Promise<NextResponse> => {
       return NextResponse.json({ ok: true });
     }
 
-    // 3. Check for Lockout
+    // 2. Lockout Check (Applies to both standard session PIN and Step-Up PIN)
     if (
       profile.pin_locked_until &&
       new Date(profile.pin_locked_until).getTime() > Date.now()
@@ -156,7 +120,7 @@ export const POST = async (request: Request): Promise<NextResponse> => {
       );
     }
 
-    // 4. Standard Session PIN Verification Flow
+    // 3. Validate PIN format
     const parsedPin = pinSchema.safeParse(body);
     if (!parsedPin.success) {
       return NextResponse.json(
@@ -171,11 +135,39 @@ export const POST = async (request: Request): Promise<NextResponse> => {
 
     const isMatch = verifyPinHash(parsedPin.data.pin, profile.pin_hash);
 
+    // 4. Handle Matching PIN
     if (isMatch) {
-      await supabase
+      const { error: resetError } = await supabase
         .from('profiles')
         .update({ pin_failed_attempts: 0, pin_locked_until: null })
         .eq('id', user.id);
+
+      if (resetError) {
+        return NextResponse.json(
+          { ok: false, errorMessage: 'Грешка при обновяване на статуса.' },
+          { status: 500 }
+        );
+      }
+
+      if (body.isStepUp) {
+        const expiresAtMs = Date.now() + STEP_UP_TTL_MINUTES * 60 * 1000;
+        const stepUpCookie = createEncryptedPinCookie(
+          user.id,
+          STEP_UP_TTL_MINUTES,
+          pinSecret,
+          'step_up'
+        );
+
+        cookieStore.set(STEP_UP_PIN_COOKIE_NAME, stepUpCookie, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          path: '/',
+          maxAge: STEP_UP_TTL_MINUTES * 60,
+        });
+
+        return NextResponse.json({ ok: true, data: { expiresAtMs } });
+      }
 
       const cookieVal = createEncryptedPinCookie(
         user.id,
@@ -194,20 +186,27 @@ export const POST = async (request: Request): Promise<NextResponse> => {
       return NextResponse.json({ ok: true });
     }
 
-    // 5. Handle Failed Attempt & Potential Lockout
+    // 5. Handle Mismatched PIN (Atomic lockout count update)
     const nextFailed = (profile.pin_failed_attempts ?? 0) + 1;
     const isNowLocked = nextFailed >= MAX_FAILED_ATTEMPTS;
     const lockedUntil = isNowLocked
       ? new Date(Date.now() + LOCKOUT_DURATION_MINUTES * 60 * 1000).toISOString()
       : null;
 
-    await supabase
+    const { error: updateError } = await supabase
       .from('profiles')
       .update({
         pin_failed_attempts: isNowLocked ? 0 : nextFailed,
         pin_locked_until: lockedUntil,
       })
       .eq('id', user.id);
+
+    if (updateError) {
+      return NextResponse.json(
+        { ok: false, errorMessage: 'Грешка при обновяване на брояча за грешки.' },
+        { status: 500 }
+      );
+    }
 
     if (isNowLocked) {
       return NextResponse.json(
@@ -226,7 +225,7 @@ export const POST = async (request: Request): Promise<NextResponse> => {
     );
   } catch {
     return NextResponse.json(
-      { ok: false, errorMessage: 'Грешка при верификация на ПИН кода.' },
+      { ok: false, errorMessage: 'Неочаквана грешка при обработка на ПИН кода.' },
       { status: 500 }
     );
   }

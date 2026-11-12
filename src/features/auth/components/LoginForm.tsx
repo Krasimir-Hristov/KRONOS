@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { ArrowRight, Cpu, Lock, Mail, ShieldAlert, Sparkles } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { authApiResponseSchema } from '../schemas/authSchema';
 
 export const LoginForm: React.FC = () => {
   const t = useTranslations('auth');
@@ -25,13 +26,12 @@ export const LoginForm: React.FC = () => {
         body: JSON.stringify({ email, password }),
       });
 
-      const result = (await res.json()) as {
-        readonly ok?: boolean;
-        readonly errorMessage?: string;
-      };
+      const rawJson: unknown = await res.json().catch(() => null);
+      const parsed = authApiResponseSchema.safeParse(rawJson);
 
-      if (!res.ok || !result.ok) {
-        setErrorMessage(result.errorMessage ?? t('invalidCredentials'));
+      if (!res.ok || !parsed.success || !parsed.data.ok) {
+        const errorMsg = parsed.success ? parsed.data.errorMessage : null;
+        setErrorMessage(errorMsg ?? t('invalidCredentials'));
         setIsSubmitting(false);
         return;
       }

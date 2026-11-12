@@ -36,23 +36,27 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
   const handleLockPin = () => {
     startTransition(async () => {
       try {
-        await fetch('/api/auth/lock', { method: 'POST' });
+        const res = await fetch('/api/auth/lock', { method: 'POST' });
+        if (res.ok) {
+          window.location.replace('/pin');
+        }
       } catch {
-        // ignore
+        // Network error; retain screen
       }
-      window.location.replace('/pin');
     });
   };
 
   const handleSignOut = () => {
     startTransition(async () => {
-      queryClient.clear();
       try {
-        await fetch('/api/auth/logout', { method: 'POST' });
+        const res = await fetch('/api/auth/logout', { method: 'POST' });
+        if (res.ok) {
+          queryClient.clear();
+          window.location.replace('/login');
+        }
       } catch {
-        // ignore
+        // Network error; retain screen
       }
-      window.location.replace('/login');
     });
   };
 

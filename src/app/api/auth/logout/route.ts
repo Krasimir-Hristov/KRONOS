@@ -6,7 +6,14 @@ import { createServerSupabaseClient } from '@/lib/supabase/supabaseServer';
 export const POST = async (): Promise<NextResponse> => {
   try {
     const supabase = await createServerSupabaseClient();
-    await supabase.auth.signOut();
+    const { error: signOutError } = await supabase.auth.signOut();
+
+    if (signOutError) {
+      return NextResponse.json(
+        { ok: false, errorMessage: 'Грешка при отписване от системата.' },
+        { status: 500 }
+      );
+    }
 
     const cookieStore = await cookies();
     cookieStore.delete(PIN_COOKIE_NAME);
@@ -15,7 +22,7 @@ export const POST = async (): Promise<NextResponse> => {
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json(
-      { ok: false, errorMessage: 'Грешка при изход от системата.' },
+      { ok: false, errorMessage: 'Неочаквана грешка при изход.' },
       { status: 500 }
     );
   }

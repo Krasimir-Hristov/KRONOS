@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Delete, KeyRound, Lock, RotateCcw, ShieldAlert } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { authApiResponseSchema } from '../schemas/authSchema';
 
 interface PinPadScreenProps {
   readonly initialHasPin?: boolean;
@@ -76,13 +77,20 @@ export const PinPadScreen: React.FC<PinPadScreenProps> = ({
   const handleSwitchAccount = async () => {
     if (isSubmitting) return;
     setIsSubmitting(true);
-    queryClient.clear();
+    setErrorMessage(null);
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      const res = await fetch('/api/auth/logout', { method: 'POST' });
+      if (!res.ok) {
+        setErrorMessage(t('networkError'));
+        setIsSubmitting(false);
+        return;
+      }
+      queryClient.clear();
+      window.location.replace('/login');
     } catch {
-      // ignore
+      setErrorMessage(t('networkError'));
+      setIsSubmitting(false);
     }
-    window.location.replace('/login');
   };
 
   const triggerVerify = async (code: string) => {
@@ -96,14 +104,12 @@ export const PinPadScreen: React.FC<PinPadScreenProps> = ({
         body: JSON.stringify({ pin: code, isStepUp }),
       });
 
-      const result = (await res.json()) as {
-        readonly ok?: boolean;
-        readonly errorMessage?: string;
-        readonly data?: { readonly expiresAtMs?: number };
-      };
+      const rawJson: unknown = await res.json().catch(() => null);
+      const parsed = authApiResponseSchema.safeParse(rawJson);
 
-      if (!res.ok || !result.ok) {
-        setErrorMessage(result.errorMessage ?? t('invalidPin'));
+      if (!res.ok || !parsed.success || !parsed.data.ok) {
+        const errorMsg = parsed.success ? parsed.data.errorMessage : null;
+        setErrorMessage(errorMsg ?? t('invalidPin'));
         setPin('');
         setIsSubmitting(false);
         return;
@@ -134,13 +140,12 @@ export const PinPadScreen: React.FC<PinPadScreenProps> = ({
         body: JSON.stringify({ pin: firstPin, confirmPin: secondPin }),
       });
 
-      const result = (await res.json()) as {
-        readonly ok?: boolean;
-        readonly errorMessage?: string;
-      };
+      const rawJson: unknown = await res.json().catch(() => null);
+      const parsed = authApiResponseSchema.safeParse(rawJson);
 
-      if (!res.ok || !result.ok) {
-        setErrorMessage(result.errorMessage ?? t('invalidPin'));
+      if (!res.ok || !parsed.success || !parsed.data.ok) {
+        const errorMsg = parsed.success ? parsed.data.errorMessage : null;
+        setErrorMessage(errorMsg ?? t('invalidPin'));
         setPin('');
         setConfirmPin('');
         setIsConfirmingSetup(false);
@@ -216,19 +221,16 @@ export const PinPadScreen: React.FC<PinPadScreenProps> = ({
         )}
 
         <div className="flex justify-center gap-4 my-6" aria-label={t('pinDotsLabel')}>
-          {[0, 1, 2, 3].map((index) => {
-            const isFilled = index < activeInput.length;
-            return (
-              <span
-                key={index}
-                className={`h-3.5 w-3.5 rounded-full transition-all duration-200 ${
-                  isFilled
-                    ? 'scale-125 bg-cyan-400 shadow-md shadow-cyan-400/80 ring-2 ring-cyan-400/30'
-                    : 'bg-zinc-800 border border-zinc-700'
-                }`}
-              />
-            );
-          })}
+          {[0, 1, 2, 3].map((index) => (
+            <span
+              key={index}
+              className={`h-3.5 w-3.5 rounded-full transition-all duration-200 ${
+                index < activeInput.length
+                  ? 'scale-125 bg-cyan-400 shadow-md shadow-cyan-400/80 ring-2 ring-cyan-400/30'
+                  : 'bg-zinc-800 border border-zinc-700'
+              }`}
+            />
+          ))}
         </div>
 
         <div className="grid grid-cols-3 gap-2.5">
@@ -248,9 +250,7 @@ export const PinPadScreen: React.FC<PinPadScreenProps> = ({
             aria-label={t('pinClearAll')}
             onClick={handleClear}
             className="h-13 rounded-2xl bg-zinc-900/40 border border-zinc-850 text-zinc-500 flex items-center justify-center hover:text-zinc-200 hover:bg-zinc-850 active:scale-95 transition-all"
-          >
-            <RotateCcw className="h-4 w-4" aria-hidden="true" />
-          </button>
+          ><RotateCcw className="h-4 w-4" aria-hidden="true" /></button>
           <button
             type="button"
             disabled={isSubmitting}
@@ -264,9 +264,7 @@ export const PinPadScreen: React.FC<PinPadScreenProps> = ({
             aria-label={t('pinDeleteDigit')}
             onClick={handleDelete}
             className="h-13 rounded-2xl bg-zinc-900/40 border border-zinc-850 text-zinc-500 flex items-center justify-center hover:text-zinc-200 hover:bg-zinc-850 active:scale-95 transition-all"
-          >
-            <Delete className="h-4 w-4" aria-hidden="true" />
-          </button>
+          ><Delete className="h-4 w-4" aria-hidden="true" /></button>
         </div>
 
         {!isStepUp && (

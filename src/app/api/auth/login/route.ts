@@ -2,8 +2,39 @@ import { NextResponse } from 'next/server';
 import { loginSchema } from '@/features/auth';
 import { createServerSupabaseClient } from '@/lib/supabase/supabaseServer';
 
+const RATE_LIMIT_WINDOW_MS = 60 * 1000;
+const MAX_LOGIN_ATTEMPTS = 10;
+const ipAttempts = new Map<string, number[]>();
+
+const isRateLimited = (ip: string): boolean => {
+  const now = Date.now();
+  const timestamps = ipAttempts.get(ip) ?? [];
+  const recent = timestamps.filter((t) => now - t < RATE_LIMIT_WINDOW_MS);
+  if (recent.length >= MAX_LOGIN_ATTEMPTS) {
+    ipAttempts.set(ip, recent);
+    return true;
+  }
+  recent.push(now);
+  ipAttempts.set(ip, recent);
+  return false;
+};
+
 export const POST = async (request: Request): Promise<NextResponse> => {
   try {
+    const forwarded = request.headers.get('x-forwarded-for');
+    const firstForwarded = forwarded ? forwarded.split(',')[0]?.trim() : null;
+    const clientIp = firstForwarded || request.headers.get('x-real-ip') || '127.0.0.1';
+
+    if (isRateLimited(clientIp)) {
+      return NextResponse.json(
+        {
+          ok: false,
+          errorMessage: 'Твърде много опити за вход. Моля, изчакайте една минута.',
+        },
+        { status: 429, headers: { 'Retry-After': '60' } }
+      );
+    }
+
     const body: unknown = await request.json();
     const parsed = loginSchema.safeParse(body);
     if (!parsed.success) {

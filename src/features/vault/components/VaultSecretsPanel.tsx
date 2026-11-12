@@ -2,10 +2,9 @@
 
 import React, { useState } from 'react';
 import { Check, Copy, Eye, EyeOff, LockKeyhole, Pencil, ShieldCheck, Trash2 } from 'lucide-react';
+import { authApiResponseSchema } from '@/features/auth';
 import type { VaultSecretMaskedItem } from '../schemas/vaultSchema';
 import { CATEGORY_LABELS_BG } from './VaultItemModal';
-
-const DEFAULT_STEP_UP_TTL_MS = 5 * 60 * 1000;
 
 interface VaultSecretsPanelProps {
   readonly isStepUpUnlocked: boolean;
@@ -47,18 +46,25 @@ export const VaultSecretsPanel: React.FC<VaultSecretsPanelProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pin: digits, isStepUp: true }),
       });
-      const data = (await res.json()) as {
-        readonly ok?: boolean;
-        readonly errorMessage?: string;
-        readonly data?: { readonly expiresAtMs?: number };
-      };
-      if (!res.ok || !data.ok) {
+      const rawJson: unknown = await res.json().catch(() => null);
+      const parsed = authApiResponseSchema.safeParse(rawJson);
+
+      if (!res.ok || !parsed.success || !parsed.data.ok) {
+        const errorMsg = parsed.success ? parsed.data.errorMessage : null;
         setPinInput('');
-        setPinError(data.errorMessage ?? 'Невалиден ПИН код за отключване.');
+        setPinError(errorMsg ?? 'Невалиден ПИН код за отключване.');
         return;
       }
+
+      const expiresAtMs = parsed.data.data?.expiresAtMs;
+      if (typeof expiresAtMs !== 'number') {
+        setPinInput('');
+        setPinError('Невалиден отговор от сървъра при отключване.');
+        return;
+      }
+
       setPinInput('');
-      onUnlocked(data.data?.expiresAtMs ?? Date.now() + DEFAULT_STEP_UP_TTL_MS);
+      onUnlocked(expiresAtMs);
     } catch {
       setPinInput('');
       setPinError('Грешка при проверка на 4-цифрения ПИН код.');
