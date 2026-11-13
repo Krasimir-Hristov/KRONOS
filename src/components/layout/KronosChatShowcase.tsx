@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Activity, Columns2, PanelLeftOpen, Timer } from 'lucide-react';
 import { ChatComposerFooter } from './ChatComposerFooter';
@@ -34,12 +34,16 @@ export const KronosChatShowcase: React.FC = () => {
   const [splitWidthPx, setSplitWidthPx] = useState<number>(430);
 
   const allSessionDocuments = useMemo((): readonly MockDocumentAttachment[] => {
-    const collected: MockDocumentAttachment[] = [];
+    const map = new Map<string, MockDocumentAttachment>();
     for (const msg of customMessages) {
-      if (msg.userUploadedDoc) collected.push(msg.userUploadedDoc);
-      if (msg.documents) collected.push(...msg.documents);
+      if (msg.userUploadedDoc) map.set(msg.userUploadedDoc.id, msg.userUploadedDoc);
+      if (msg.documents) {
+        for (const doc of msg.documents) {
+          map.set(doc.id, doc);
+        }
+      }
     }
-    return collected;
+    return Array.from(map.values());
   }, [customMessages]);
 
   const handleSelectSession = useCallback((sessionId: string) => {
@@ -58,9 +62,14 @@ export const KronosChatShowcase: React.FC = () => {
     setSelectedDocId(firstDoc);
   }, [isThinking]);
 
+  const prevSessionParamRef = useRef<string | null>(null);
+
   useEffect(() => {
     const sessionParam = searchParams.get('session');
-    if (sessionParam) handleSelectSession(sessionParam);
+    if (sessionParam && sessionParam !== prevSessionParamRef.current) {
+      prevSessionParamRef.current = sessionParam;
+      handleSelectSession(sessionParam);
+    }
   }, [searchParams, handleSelectSession]);
 
   useEffect(() => {
@@ -122,7 +131,8 @@ export const KronosChatShowcase: React.FC = () => {
       const answeredAt = formatNowTime();
       if (userQuestionText?.trim()) {
         const active = MOCK_CHAT_SESSIONS.find((s) => s.id === activeSessionId);
-        const sampleDocs = active ? active.messages.flatMap((m) => m.documents ?? []).slice(0, 2) : undefined;
+        const rawDocs = active ? active.messages.flatMap((m) => m.documents ?? []) : [];
+        const sampleDocs = Array.from(new Map(rawDocs.map((d) => [d.id, d])).values()).slice(0, 2);
         const sampleFacts = active ? active.messages.flatMap((m) => m.facts ?? []).slice(0, 2) : undefined;
 
         setCustomMessages((prev) => [

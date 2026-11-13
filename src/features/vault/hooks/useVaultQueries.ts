@@ -27,14 +27,14 @@ export const VAULT_QUERY_KEYS = {
 };
 
 export const useVaultFactsQuery = (
-  initialFacts: readonly VaultFactItem[] = MOCK_VAULT_FACTS,
+  initialFacts?: readonly VaultFactItem[],
   isDemo = false
 ) => {
   return useQuery({
-    queryKey: VAULT_QUERY_KEYS.facts,
+    queryKey: [...VAULT_QUERY_KEYS.facts, isDemo ? 'demo' : 'live'] as const,
     staleTime: 30_000,
     queryFn: async () => {
-      if (isDemo) return initialFacts;
+      if (isDemo) return initialFacts ?? MOCK_VAULT_FACTS;
       const res = await fetchVaultFactsAction();
       if (!res.ok) throw new Error(res.errorMessage);
       return res.data;
@@ -49,7 +49,7 @@ export const useVaultSecretsQuery = (
   isDemo = false
 ) => {
   return useQuery({
-    queryKey: VAULT_QUERY_KEYS.secrets,
+    queryKey: [...VAULT_QUERY_KEYS.secrets, isDemo ? 'demo' : 'live'] as const,
     enabled,
     staleTime: 30_000,
     retry: false,

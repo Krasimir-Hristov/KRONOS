@@ -108,6 +108,10 @@ export const VaultWorkspace: React.FC<VaultWorkspaceProps> = ({
   }, [secretsQuery.data, searchQuery, selectedCategory]);
 
   const handleDeleteFact = async (item: VaultFactItem) => {
+    if (isDemo) {
+      setDeleteError('В демо режим изтриването на факти е симулирано и блокирано за сигурност.');
+      return;
+    }
     if (!window.confirm(`Да се изтрие ли завинаги „${item.label}“ от KRONOS?`)) return;
     setDeleteError(null);
     setDeletingId(item.id);
@@ -125,6 +129,10 @@ export const VaultWorkspace: React.FC<VaultWorkspaceProps> = ({
   };
 
   const handleDeleteSecret = async (item: VaultSecretMaskedItem) => {
+    if (isDemo) {
+      setDeleteError('В демо режим изтриването на пароли е симулирано и блокирано за сигурност.');
+      return;
+    }
     if (!window.confirm(`Да се изтрие ли завинаги криптираната парола „${item.label}“?`)) return;
     setDeleteError(null);
     setDeletingId(item.id);
@@ -221,6 +229,10 @@ export const VaultWorkspace: React.FC<VaultWorkspaceProps> = ({
           errorMessage={modalError}
           onClose={() => setModalOpen(false)}
           onSubmitFact={async (payload) => {
+            if (isDemo) {
+              setModalError('В демо режим добавянето и редакцията на факти са симулирани.');
+              return;
+            }
             setModalError(null);
             try {
               if (payload.id) {
@@ -245,6 +257,10 @@ export const VaultWorkspace: React.FC<VaultWorkspaceProps> = ({
             }
           }}
           onSubmitSecret={async (payload) => {
+            if (isDemo) {
+              setModalError('В демо режим добавянето и редакцията на пароли са симулирани.');
+              return;
+            }
             setModalError(null);
             try {
               if (payload.id) {

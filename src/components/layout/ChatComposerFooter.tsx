@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useTranslations } from 'next-intl';
 import {
   AudioLines,
   Mic,
@@ -23,6 +24,8 @@ export const ChatComposerFooter: React.FC<ChatComposerFooterProps> = ({
   onPromptChange,
   onSubmit,
 }) => {
+  const t = useTranslations('chat');
+
   return (
     <footer className="sticky bottom-0 z-20 bg-linear-to-t from-[#060a0e] via-[#060a0e]/95 to-transparent px-3 pb-3.5 pt-2 sm:px-6 sm:pb-4.5">
       <form
@@ -31,7 +34,7 @@ export const ChatComposerFooter: React.FC<ChatComposerFooterProps> = ({
           if (!promptText.trim() || isThinking) return;
           onSubmit();
         }}
-        aria-label="Поле за въпрос към KRONOS AI"
+        aria-label={t('composerFormAria')}
         className={`mx-auto max-w-3xl rounded-3xl border bg-[#0b131a]/95 p-2 shadow-2xl backdrop-blur-2xl transition-all duration-300 ${
           isThinking
             ? 'border-teal-400/60 shadow-teal-500/15'
@@ -43,8 +46,8 @@ export const ChatComposerFooter: React.FC<ChatComposerFooterProps> = ({
           <button
             type="button"
             disabled
-            aria-label="Прикачи PDF или снимка (демо режим)"
-            title="Прикачване (демонстрационен режим — очаквайте в следваща фаза)"
+            aria-label={t('attachDemoAria')}
+            title={t('attachDemoTitle')}
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-zinc-800/60 bg-[#080e14]/50 text-zinc-600 cursor-not-allowed opacity-60"
           >
             <Paperclip className="h-4 w-4" aria-hidden="true" />
@@ -58,10 +61,10 @@ export const ChatComposerFooter: React.FC<ChatComposerFooterProps> = ({
             onChange={(e) => onPromptChange(e.target.value)}
             placeholder={
               isThinking
-                ? 'KRONOS мисли в момента — изчакайте завършване на анализа...'
-                : 'Задайте въпрос към KRONOS AI...'
+                ? t('thinkingPlaceholder')
+                : t('idlePlaceholder')
             }
-            aria-label="Текст на въпроса"
+            aria-label={t('inputAria')}
             className="w-full min-w-0 bg-transparent px-2 py-1.5 text-base text-zinc-100 placeholder:text-zinc-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
           />
 
@@ -69,8 +72,8 @@ export const ChatComposerFooter: React.FC<ChatComposerFooterProps> = ({
           <button
             type="button"
             disabled
-            aria-label="Гласово въвеждане / Диктуване (демо режим)"
-            title="Диктуване с глас (демонстрационен режим — очаквайте в следваща фаза)"
+            aria-label={t('dictationDemoAria')}
+            title={t('dictationDemoTitle')}
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-zinc-800/60 bg-[#080e14]/50 text-zinc-600 cursor-not-allowed opacity-60"
           >
             <Mic className="h-4 w-4" aria-hidden="true" />
@@ -80,8 +83,8 @@ export const ChatComposerFooter: React.FC<ChatComposerFooterProps> = ({
           <button
             type="button"
             disabled
-            aria-label="Гласов разговор на живо (демо режим)"
-            title="Разговор на живо (демонстрационен режим — очаквайте в следваща фаза)"
+            aria-label={t('voiceLiveDemoAria')}
+            title={t('voiceLiveDemoTitle')}
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-teal-950/60 bg-teal-950/20 text-teal-800 cursor-not-allowed opacity-60"
           >
             <AudioLines className="h-4 w-4" aria-hidden="true" />
@@ -91,8 +94,8 @@ export const ChatComposerFooter: React.FC<ChatComposerFooterProps> = ({
           <button
             type="submit"
             disabled={isThinking || promptText.trim().length === 0}
-            aria-label="Изпрати въпроса"
-            title="Изпрати"
+            aria-label={t('sendAria')}
+            title={t('sendTitle')}
             className="cursor-pointer flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-linear-to-r from-teal-500 to-emerald-500 text-zinc-950 shadow-md shadow-teal-500/25 transition-all hover:brightness-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-35"
           >
             <Send className="h-4 w-4" aria-hidden="true" />
@@ -102,11 +105,11 @@ export const ChatComposerFooter: React.FC<ChatComposerFooterProps> = ({
         <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-zinc-800/70 px-2 pt-1.5 text-[10px] text-zinc-400">
           <span className="inline-flex items-center gap-1 text-teal-300 font-semibold">
             <Sparkles className="h-3 w-3 text-teal-400" aria-hidden="true" />
-            Чат с KRONOS AI
+            {t('footerDisclaimer')}
           </span>
           <span className="inline-flex items-center gap-1 font-mono text-emerald-400">
             <ShieldCheck className="h-3 w-3" aria-hidden="true" />
-            AES-256 & 4-ПИН
+            {t('footerNeuralBadge')}
           </span>
         </div>
       </form>

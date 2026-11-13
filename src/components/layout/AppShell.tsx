@@ -36,8 +36,8 @@ const AppShellContent: React.FC<AppShellProps> = ({ children }) => {
 
   const mobileNavItems = [
     { href: '/', label: t('chat'), icon: MessageSquareCode, exact: true },
-    { href: '/documents', label: t('documents'), icon: FileCode2, exact: false },
-    { href: '/vault', label: t('vault'), icon: KeySquare, exact: false },
+    { href: '/documents?demo=true', label: t('documents'), icon: FileCode2, exact: false },
+    { href: '/vault?demo=true', label: t('vault'), icon: KeySquare, exact: false },
   ] as const;
 
   const handleStartSidebarResize = (e: React.MouseEvent) => {
@@ -238,7 +238,8 @@ const AppShellContent: React.FC<AppShellProps> = ({ children }) => {
       >
         {mobileNavItems.map((item) => {
           const Icon = item.icon;
-          const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href);
+          const baseHref = item.href.split('?')[0] ?? item.href;
+          const isActive = item.exact ? pathname === baseHref : pathname.startsWith(baseHref);
           return (
             <Link key={item.href} href={item.href} aria-label={item.label} className={`flex flex-col items-center justify-center gap-1 rounded-xl py-2 text-[11px] font-semibold transition-colors ${isActive ? 'text-teal-300 bg-teal-500/15' : 'text-zinc-400 hover:text-zinc-200'}`}>
               <Icon className="h-4 w-4" aria-hidden="true" />

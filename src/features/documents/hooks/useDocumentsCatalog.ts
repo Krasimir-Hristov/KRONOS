@@ -31,9 +31,14 @@ import {
 import { useDocumentBulkExport } from './useDocumentBulkExport';
 
 export const DOCUMENTS_QUERY_KEYS = {
-  catalog: (query: string, topic: string, sortBy: DocumentSortMode) =>
-    ['documents', 'catalog', query, topic, sortBy] as const,
-  reviewQueue: ['documents', 'reviewQueue'] as const,
+  catalog: (
+    query: string,
+    topic: string,
+    sortBy: DocumentSortMode,
+    isDemo: boolean
+  ) => ['documents', 'catalog', query, topic, sortBy, isDemo ? 'demo' : 'live'] as const,
+  reviewQueue: (isDemo: boolean) =>
+    ['documents', 'reviewQueue', isDemo ? 'demo' : 'live'] as const,
 };
 
 const sortCatalogItems = (
@@ -102,7 +107,7 @@ export const useDocumentsCatalog = (
   }, []);
 
   const catalogQuery = useInfiniteQuery({
-    queryKey: DOCUMENTS_QUERY_KEYS.catalog(debouncedQuery, topicFilter, sortBy),
+    queryKey: DOCUMENTS_QUERY_KEYS.catalog(debouncedQuery, topicFilter, sortBy, isDemo),
     initialPageParam: 0,
     staleTime: 30_000,
     queryFn: async ({ pageParam = 0 }) => {
@@ -143,30 +148,36 @@ export const useDocumentsCatalog = (
       }
       return allPages.reduce((sum, page) => sum + page.length, 0);
     },
-    initialData: {
-      pages: [initialCatalog],
-      pageParams: [0],
-    },
+    initialData:
+      debouncedQuery === '' && topicFilter === '' && sortBy === 'doc_date_desc'
+        ? {
+            pages: [initialCatalog],
+            pageParams: [0],
+          }
+        : undefined,
   });
 
   const catalogItems = useMemo(() => {
     const rawPages = catalogQuery.data?.pages?.flat();
-    const source = rawPages && rawPages.length > 0 ? rawPages : initialCatalog;
-    const q = debouncedQuery.toLowerCase();
-    const filtered = source.filter((doc) => {
-      if (topicFilter && doc.topic !== topicFilter) return false;
-      if (!q) return true;
-      return (
-        doc.title.toLowerCase().includes(q) ||
-        doc.sender.toLowerCase().includes(q) ||
-        doc.summaryText.toLowerCase().includes(q)
-      );
-    });
-    return sortCatalogItems(filtered, sortBy);
-  }, [catalogQuery.data?.pages, initialCatalog, debouncedQuery, topicFilter, sortBy]);
+    const source = rawPages !== undefined ? rawPages : initialCatalog;
+    if (isDemo) {
+      const q = debouncedQuery.toLowerCase();
+      const filtered = source.filter((doc) => {
+        if (topicFilter && doc.topic !== topicFilter) return false;
+        if (!q) return true;
+        return (
+          doc.title.toLowerCase().includes(q) ||
+          doc.sender.toLowerCase().includes(q) ||
+          doc.summaryText.toLowerCase().includes(q)
+        );
+      });
+      return sortCatalogItems(filtered, sortBy);
+    }
+    return source;
+  }, [catalogQuery.data?.pages, initialCatalog, debouncedQuery, topicFilter, sortBy, isDemo]);
 
   const reviewQueueQuery = useQuery({
-    queryKey: DOCUMENTS_QUERY_KEYS.reviewQueue,
+    queryKey: DOCUMENTS_QUERY_KEYS.reviewQueue(isDemo),
     staleTime: 30_000,
     queryFn: async () => {
       if (isDemo) return initialReviewQueue;

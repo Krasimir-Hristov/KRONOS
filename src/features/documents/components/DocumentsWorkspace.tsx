@@ -71,6 +71,10 @@ export const DocumentsWorkspace: React.FC<DocumentsWorkspaceProps> = ({
   };
 
   const handlePurgeIds = async (ids: readonly string[], labelForConfirm: string) => {
+    if (isDemo) {
+      setFeedbackBanner('В демо режим изтриването на документи е симулирано и блокирано за безопасност.');
+      return;
+    }
     if (
       !window.confirm(
         `Сигурни ли сте, че искате да изтриете ЗАВИНАГИ ${labelForConfirm} (файл от Supabase Storage + OCR текст + вектори)?`
@@ -142,7 +146,15 @@ export const DocumentsWorkspace: React.FC<DocumentsWorkspaceProps> = ({
         <BulkUploadDropzone
           tasks={uploadQueue.tasks}
           isProcessingBatch={uploadQueue.isProcessingBatch}
-          onFilesSelected={uploadQueue.enqueueFiles}
+          onFilesSelected={async (files) => {
+            if (isDemo) {
+              setFeedbackBanner(
+                'В демо режим качването е симулирано. За реално качване преминете в работен режим.'
+              );
+              return { uploadedCount: 0, failedCount: 0 };
+            }
+            return uploadQueue.enqueueFiles(files);
+          }}
           onClearFinished={uploadQueue.clearFinishedTasks}
         />
 
@@ -150,9 +162,19 @@ export const DocumentsWorkspace: React.FC<DocumentsWorkspaceProps> = ({
           items={reviewItems}
           isApproving={catalog.approveBatchMutation.isPending}
           isRetryingOcr={catalog.retryOcrMutation.isPending}
-          onApproveBatch={(batch) => catalog.approveBatchMutation.mutateAsync(batch)}
+          onApproveBatch={async (batch) => {
+            if (isDemo) {
+              setFeedbackBanner('В демо режим одобрението е симулирано.');
+              return { approvedCount: batch.length, savedFactsCount: 0 };
+            }
+            return catalog.approveBatchMutation.mutateAsync(batch);
+          }}
           onApproveOutcome={handleApproveOutcome}
           onRetryOcr={async (docId) => {
+            if (isDemo) {
+              setFeedbackBanner('В демо режим OCR анализът е симулиран.');
+              return;
+            }
             setErrorBanner(null);
             try {
               await catalog.retryOcrMutation.mutateAsync(docId);

@@ -22,6 +22,15 @@ interface DocumentsPageProps {
   readonly searchParams: Promise<{ readonly preview?: string; readonly demo?: string }>;
 }
 
+const withTimeout = async <T,>(promise: Promise<T>, timeoutMs = 2500): Promise<T> => {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('Времето за връзка към базата данни изтече.')), timeoutMs);
+    }),
+  ]);
+};
+
 const DocumentsPage: React.FC<DocumentsPageProps> = async ({ searchParams }) => {
   await requireAuthAndPin();
   const params = await searchParams;
@@ -36,21 +45,34 @@ const DocumentsPage: React.FC<DocumentsPageProps> = async ({ searchParams }) => 
     initialCatalog = MOCK_CATALOG_DOCUMENTS;
     initialReviewQueue = MOCK_REVIEW_QUEUE_DOCUMENTS;
   } else {
-    try {
-      const [catalogDocs, reviewDocs] = await Promise.all([
+    const [catalogResult, reviewResult] = await Promise.allSettled([
+      withTimeout(
         searchCatalogDocumentsClassic({
           query: '',
           sortBy: 'doc_date_desc',
           limit: 50,
           offset: 0,
-        }),
-        listReviewQueueDocuments(),
-      ]);
-      initialCatalog = catalogDocs;
-      initialReviewQueue = reviewDocs;
-    } catch (err) {
+        })
+      ),
+      withTimeout(listReviewQueueDocuments()),
+    ]);
+
+    if (catalogResult.status === 'fulfilled') {
+      initialCatalog = catalogResult.value;
+    } else {
       initialLoadError =
-        err instanceof Error ? err.message : 'Грешка при зареждане на документите.';
+        catalogResult.reason instanceof Error
+          ? catalogResult.reason.message
+          : 'Грешка при зареждане на каталога с документи.';
+    }
+
+    if (reviewResult.status === 'fulfilled') {
+      initialReviewQueue = reviewResult.value;
+    } else if (!initialLoadError) {
+      initialLoadError =
+        reviewResult.reason instanceof Error
+          ? reviewResult.reason.message
+          : 'Грешка при зареждане на опашката за одобрение.';
     }
   }
 

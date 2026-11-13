@@ -31,13 +31,19 @@ export const SidebarNavSections: React.FC<SidebarNavSectionsProps> = ({
   const navItems = [
     { href: '/', label: t('chat'), icon: MessageSquareCode, exact: true, badge: 'AI UI' },
     {
-      href: '/documents',
+      href: '/documents?demo=true',
       label: t('documents'),
       icon: FileCode2,
       exact: false,
-      badge: 'МОК',
+      badge: 'RAG',
     },
-    { href: '/vault', label: t('vault'), icon: KeySquare, exact: false, badge: 'МОК' },
+    {
+      href: '/vault?demo=true',
+      label: t('vault'),
+      icon: KeySquare,
+      exact: false,
+      badge: 'PIN',
+    },
   ] as const;
 
   const handleSelectChatSession = (sessionId: string) => {
@@ -72,9 +78,10 @@ export const SidebarNavSections: React.FC<SidebarNavSectionsProps> = ({
         </span>
         {navItems.map((item) => {
           const Icon = item.icon;
+          const baseHref = item.href.split('?')[0] ?? item.href;
           const isActive = item.exact
-            ? pathname === item.href
-            : pathname.startsWith(item.href);
+            ? pathname === baseHref
+            : pathname.startsWith(baseHref);
           return (
             <Link
               key={item.href}
