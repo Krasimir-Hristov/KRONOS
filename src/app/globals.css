@@ -154,3 +154,17 @@
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(45, 212, 191, 0.45);
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-spin,
+  .animate-pulse,
+  .animate-thinking-surface,
+  .animate-neural-idle,
+  .animate-neural-thinking,
+  .animate-synapse-flow,
+  .animate-synapse-fast,
+  .animate-kronos-glint {
+    animation: none !important;
+    transition: none !important;
+  }
+}

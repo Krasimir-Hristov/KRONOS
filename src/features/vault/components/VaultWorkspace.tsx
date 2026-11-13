@@ -23,12 +23,14 @@ interface VaultWorkspaceProps {
   readonly initialFacts?: readonly VaultFactItem[];
   readonly initialLoadError?: string | null;
   readonly initialStepUpExpiresAtMs?: number | null;
+  readonly isDemo?: boolean;
 }
 
 export const VaultWorkspace: React.FC<VaultWorkspaceProps> = ({
   initialFacts,
   initialLoadError = null,
   initialStepUpExpiresAtMs = null,
+  isDemo = false,
 }) => {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<'facts' | 'secrets'>('facts');
@@ -71,10 +73,11 @@ export const VaultWorkspace: React.FC<VaultWorkspaceProps> = ({
     };
   }, [stepUpExpiresAtMs, handleStepUpExpired]);
 
-  const factsQuery = useVaultFactsQuery(initialFacts);
+  const factsQuery = useVaultFactsQuery(initialFacts, isDemo);
   const secretsQuery = useVaultSecretsQuery(
     activeTab === 'secrets' && isStepUpUnlocked,
-    handleStepUpExpired
+    handleStepUpExpired,
+    isDemo
   );
   const factMutations = useVaultFactMutations();
   const secretMutations = useVaultSecretMutations(handleStepUpExpired);

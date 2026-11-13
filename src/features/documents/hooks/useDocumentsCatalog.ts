@@ -10,8 +10,10 @@ import {
 import { VAULT_QUERY_KEYS } from '@/features/vault';
 import {
   approveDocumentsBatchAction,
+  fetchReviewQueueAction,
   processDocumentOcrAction,
   purgeDocumentsAction,
+  searchDocumentsClassicAction,
   updateDocumentMetaAction,
 } from '../dal/documentActions';
 import {
@@ -34,9 +36,37 @@ export const DOCUMENTS_QUERY_KEYS = {
   reviewQueue: ['documents', 'reviewQueue'] as const,
 };
 
+const sortCatalogItems = (
+  items: readonly CatalogDocumentItem[],
+  sort: DocumentSortMode
+): readonly CatalogDocumentItem[] => {
+  return [...items].sort((a, b) => {
+    switch (sort) {
+      case 'doc_date_desc': {
+        const da = a.docDate ?? a.createdAt;
+        const db = b.docDate ?? b.createdAt;
+        return db.localeCompare(da);
+      }
+      case 'doc_date_asc': {
+        const da = a.docDate ?? a.createdAt;
+        const db = b.docDate ?? b.createdAt;
+        return da.localeCompare(db);
+      }
+      case 'created_at_desc':
+        return b.createdAt.localeCompare(a.createdAt);
+      case 'created_at_asc':
+        return a.createdAt.localeCompare(b.createdAt);
+      case 'relevance':
+      default:
+        return 0;
+    }
+  });
+};
+
 export const useDocumentsCatalog = (
   initialCatalog: readonly CatalogDocumentItem[] = MOCK_CATALOG_DOCUMENTS,
-  initialReviewQueue: readonly CatalogDocumentItem[] = MOCK_REVIEW_QUEUE_DOCUMENTS
+  initialReviewQueue: readonly CatalogDocumentItem[] = MOCK_REVIEW_QUEUE_DOCUMENTS,
+  isDemo = false
 ) => {
   const queryClient = useQueryClient();
   const [searchInput, setSearchInput] = useState('');
@@ -74,18 +104,38 @@ export const useDocumentsCatalog = (
   const catalogQuery = useInfiniteQuery({
     queryKey: DOCUMENTS_QUERY_KEYS.catalog(debouncedQuery, topicFilter, sortBy),
     initialPageParam: 0,
-    staleTime: Number.POSITIVE_INFINITY,
-    queryFn: async () => {
-      const q = debouncedQuery.toLowerCase();
-      return initialCatalog.filter((doc) => {
-        if (topicFilter && doc.topic !== topicFilter) return false;
-        if (!q) return true;
-        return (
-          doc.title.toLowerCase().includes(q) ||
-          doc.sender.toLowerCase().includes(q) ||
-          doc.summaryText.toLowerCase().includes(q)
+    staleTime: 30_000,
+    queryFn: async ({ pageParam = 0 }) => {
+      if (isDemo) {
+        const q = debouncedQuery.toLowerCase();
+        const filtered = initialCatalog.filter((doc) => {
+          if (topicFilter && doc.topic !== topicFilter) return false;
+          if (!q) return true;
+          return (
+            doc.title.toLowerCase().includes(q) ||
+            doc.sender.toLowerCase().includes(q) ||
+            doc.summaryText.toLowerCase().includes(q)
+          );
+        });
+        return sortCatalogItems(filtered, sortBy).slice(
+          pageParam,
+          pageParam + CLASSIC_SEARCH_PAGE_SIZE
         );
+      }
+
+      const res = await searchDocumentsClassicAction({
+        query: debouncedQuery,
+        topic: topicFilter || undefined,
+        sortBy,
+        limit: CLASSIC_SEARCH_PAGE_SIZE,
+        offset: pageParam,
       });
+
+      if (!res.ok) {
+        throw new Error(res.errorMessage);
+      }
+
+      return res.data;
     },
     getNextPageParam: (lastPage, allPages) => {
       if (lastPage.length < CLASSIC_SEARCH_PAGE_SIZE) {
@@ -100,8 +150,10 @@ export const useDocumentsCatalog = (
   });
 
   const catalogItems = useMemo(() => {
+    const rawPages = catalogQuery.data?.pages?.flat();
+    const source = rawPages && rawPages.length > 0 ? rawPages : initialCatalog;
     const q = debouncedQuery.toLowerCase();
-    return initialCatalog.filter((doc) => {
+    const filtered = source.filter((doc) => {
       if (topicFilter && doc.topic !== topicFilter) return false;
       if (!q) return true;
       return (
@@ -110,12 +162,18 @@ export const useDocumentsCatalog = (
         doc.summaryText.toLowerCase().includes(q)
       );
     });
-  }, [initialCatalog, debouncedQuery, topicFilter]);
+    return sortCatalogItems(filtered, sortBy);
+  }, [catalogQuery.data?.pages, initialCatalog, debouncedQuery, topicFilter, sortBy]);
 
   const reviewQueueQuery = useQuery({
     queryKey: DOCUMENTS_QUERY_KEYS.reviewQueue,
-    staleTime: Number.POSITIVE_INFINITY,
-    queryFn: async () => initialReviewQueue,
+    staleTime: 30_000,
+    queryFn: async () => {
+      if (isDemo) return initialReviewQueue;
+      const res = await fetchReviewQueueAction();
+      if (!res.ok) throw new Error(res.errorMessage);
+      return res.data;
+    },
     initialData: initialReviewQueue,
   });
 

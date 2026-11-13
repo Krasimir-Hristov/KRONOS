@@ -41,15 +41,12 @@ export const SidebarNavSections: React.FC<SidebarNavSectionsProps> = ({
   ] as const;
 
   const handleSelectChatSession = (sessionId: string) => {
+    const targetUrl = `/?session=${encodeURIComponent(sessionId)}`;
     if (pathname !== '/') {
-      router.push('/');
-      window.setTimeout(() => {
-        window.dispatchEvent(
-          new CustomEvent<string>(KRONOS_SESSION_EVENT, { detail: sessionId })
-        );
-      }, 120);
+      router.push(targetUrl);
       return;
     }
+    router.replace(targetUrl);
     window.dispatchEvent(
       new CustomEvent<string>(KRONOS_SESSION_EVENT, { detail: sessionId })
     );
@@ -61,17 +58,17 @@ export const SidebarNavSections: React.FC<SidebarNavSectionsProps> = ({
       <button
         type="button"
         onClick={() => handleSelectChatSession('new')}
-        aria-label="Започни нов разговор"
+        aria-label={t('newChatAria')}
         className="cursor-pointer flex w-full items-center justify-center gap-2 rounded-xl border border-teal-500/45 bg-linear-to-r from-teal-500/20 via-teal-500/15 to-emerald-500/20 px-3.5 py-2.5 text-xs font-bold text-teal-100 shadow-md shadow-teal-500/10 transition-all hover:border-teal-400 hover:from-teal-500/30 hover:to-emerald-500/30"
       >
         <MessageSquarePlus className="h-4 w-4 text-teal-300" aria-hidden="true" />
-        <span>+ Нов разговор</span>
+        <span>{t('newChat')}</span>
       </button>
 
       {/* Active Mock-Data Workspace Links */}
       <div className="space-y-1.5">
         <span className="px-2.5 text-[10px] font-bold uppercase tracking-wider text-teal-400/80">
-          Основни Модули (UI Преглед)
+          {t('coreModules')}
         </span>
         {navItems.map((item) => {
           const Icon = item.icon;
@@ -109,7 +106,7 @@ export const SidebarNavSections: React.FC<SidebarNavSectionsProps> = ({
       {/* ChatGPT / Gemini Recent Chat Sessions */}
       <div className="space-y-1.5">
         <span className="px-2.5 text-[10px] font-bold uppercase tracking-wider text-zinc-500">
-          Последни разговори
+          {t('recentChats')}
         </span>
         {MOCK_CHAT_SESSIONS.map((session) => (
           <button
@@ -136,26 +133,32 @@ export const SidebarNavSections: React.FC<SidebarNavSectionsProps> = ({
       {/* Inactive Placeholder Sidebar Links for Visual Inspection */}
       <div className="space-y-1.5">
         <span className="px-2.5 text-[10px] font-bold uppercase tracking-wider text-zinc-500">
-          AI Субагенти (Неактивни)
+          {t('subagentsInactive')}
         </span>
-        {SIDEBAR_PLACEHOLDER_LINKS.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            onClick={(e) => e.preventDefault()}
-            title={item.hint}
-            aria-label={`${item.label} (${item.hint})`}
-            className="cursor-pointer flex w-full items-center justify-between rounded-xl border border-dashed border-zinc-800/80 bg-[#070c11]/70 px-3 py-2 text-left text-[11px] text-zinc-500 transition-colors hover:border-teal-500/30 hover:text-zinc-300"
-          >
-            <span className="flex items-center gap-2 truncate">
-              <Sparkles className="h-3.5 w-3.5 shrink-0 text-teal-500/50" aria-hidden="true" />
-              <span className="truncate">{item.label}</span>
-            </span>
-            <span className="rounded bg-zinc-800/90 px-1.5 py-0.5 font-mono text-[9px] text-zinc-400">
-              {item.badge}
-            </span>
-          </button>
-        ))}
+        {SIDEBAR_PLACEHOLDER_LINKS.map((item) => {
+          const label = item.labelKey && t.has(item.labelKey) ? t(item.labelKey) : (item.label ?? item.id);
+          const badge = item.badgeKey && t.has(item.badgeKey) ? t(item.badgeKey) : (item.badge ?? '');
+          const hint = item.hintKey && t.has(item.hintKey) ? t(item.hintKey) : (item.hint ?? '');
+
+          return (
+            <button
+              key={item.id}
+              type="button"
+              disabled
+              title={hint}
+              aria-label={`${label} (${hint})`}
+              className="cursor-not-allowed flex w-full items-center justify-between rounded-xl border border-dashed border-zinc-800/80 bg-[#070c11]/70 px-3 py-2 text-left text-[11px] text-zinc-500 opacity-70"
+            >
+              <span className="flex items-center gap-2 truncate">
+                <Sparkles className="h-3.5 w-3.5 shrink-0 text-teal-500/50" aria-hidden="true" />
+                <span className="truncate">{label}</span>
+              </span>
+              <span className="rounded bg-zinc-800/90 px-1.5 py-0.5 font-mono text-[9px] text-zinc-400">
+                {badge}
+              </span>
+            </button>
+          );
+        })}
       </div>
     </nav>
   );

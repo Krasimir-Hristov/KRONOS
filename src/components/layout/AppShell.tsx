@@ -11,6 +11,7 @@ import {
   LogOut,
   MessageSquareCode,
   PanelLeftClose,
+  PanelLeftOpen,
   ShieldCheck,
 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -98,7 +99,7 @@ const AppShellContent: React.FC<AppShellProps> = ({ children }) => {
 
   return (
     <div className="h-screen w-screen overflow-hidden bg-[#060a0e] text-zinc-100 flex flex-col lg:flex-row font-sans selection:bg-teal-500/30 selection:text-teal-200">
-      {/* Resizable Desktop Sidebar as Flex Sibling (Never Fixed, Zero Horizontal Scroll) */}
+      {/* Resizable Desktop Sidebar */}
       {isSidebarOpen && (
         <aside
           style={{ width: `${sidebarWidthPx}px` }}
@@ -107,33 +108,21 @@ const AppShellContent: React.FC<AppShellProps> = ({ children }) => {
           <div className="flex h-14 shrink-0 items-center justify-between gap-2 px-3.5 border-b border-teal-950/80 bg-[#080e14]/95">
             <Link href="/" aria-label="KRONOS Начало" className="flex items-center gap-3 min-w-0">
               <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-teal-500/40 bg-[#0b151d] p-1 shadow-md shadow-teal-500/20">
-                <Image
-                  src="/kronos-logo.png"
-                  alt="KRONOS Logo"
-                  width={30}
-                  height={30}
-                  className="rounded-xl object-cover"
-                />
+                <Image src="/kronos-logo.png" alt="KRONOS Logo" width={30} height={30} className="rounded-xl object-cover" />
               </span>
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <span className="animate-kronos-glint text-base font-black tracking-widest uppercase">
-                    KRONOS
-                  </span>
-                  <span className="rounded border border-teal-500/35 bg-teal-500/10 px-1.5 py-0.5 text-[9px] font-mono font-bold text-teal-300">
-                    NEURAL
-                  </span>
+                  <span className="animate-kronos-glint text-base font-black tracking-widest uppercase">KRONOS</span>
+                  <span className="rounded border border-teal-500/35 bg-teal-500/10 px-1.5 py-0.5 text-[9px] font-mono font-bold text-teal-300">NEURAL</span>
                 </div>
-                <span className="block truncate text-[10px] font-medium text-zinc-400">
-                  {appT('subtitle')}
-                </span>
+                <span className="block truncate text-[10px] font-medium text-zinc-400">{appT('subtitle')}</span>
               </div>
             </Link>
             <button
               type="button"
               onClick={() => setIsSidebarOpen(false)}
-              aria-label="Затвори страничното меню"
-              title="Скрий сайдбара"
+              aria-label={t('closeSidebar')}
+              title={t('closeSidebar')}
               className="cursor-pointer flex h-7 w-7 shrink-0 items-center justify-center rounded-xl border border-zinc-800 bg-[#0b141c] text-zinc-400 hover:border-teal-500/40 hover:text-teal-300"
             >
               <PanelLeftClose className="h-4 w-4" aria-hidden="true" />
@@ -209,12 +198,34 @@ const AppShellContent: React.FC<AppShellProps> = ({ children }) => {
         </div>
       </header>
 
+      {/* Mobile Action Error Alert */}
+      {actionError && (
+        <div className="lg:hidden bg-rose-950/80 border-b border-rose-500/40 px-4 py-1.5 text-center">
+          <p role="alert" className="text-xs font-medium text-rose-300">
+            {actionError}
+          </p>
+        </div>
+      )}
+
       {/* Main App Canvas */}
       <main className="flex-1 min-w-0 h-full overflow-hidden flex flex-col">
+        {!isSidebarOpen && !isChatHome && (
+          <div className="hidden lg:flex items-center border-b border-teal-950/70 bg-[#080e14]/90 px-4 py-2">
+            <button
+              type="button"
+              onClick={() => setIsSidebarOpen(true)}
+              aria-label={t('openSidebar')}
+              className="cursor-pointer inline-flex items-center gap-1.5 rounded-xl border border-teal-500/40 bg-[#09131b] px-2.5 py-1 text-xs font-bold text-teal-200 hover:border-teal-400 hover:bg-[#0d1d2b]"
+            >
+              <PanelLeftOpen className="h-4 w-4 text-teal-400" aria-hidden="true" />
+              <span>{t('openSidebar')}</span>
+            </button>
+          </div>
+        )}
         {isChatHome ? (
           children
         ) : (
-          <div className="flex-1 overflow-y-auto p-4 sm:p-8">
+          <div className="flex-1 overflow-y-auto p-4 pb-24 sm:p-8 lg:pb-8">
             <div className="mx-auto max-w-6xl">{children}</div>
           </div>
         )}

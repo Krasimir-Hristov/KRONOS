@@ -28,10 +28,14 @@ export const ChatMessageAttachments: React.FC<ChatMessageAttachmentsProps> = ({
 }) => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  const handleCopyFact = (id: string, value: string) => {
-    void navigator.clipboard.writeText(value);
-    setCopiedId(id);
-    window.setTimeout(() => setCopiedId(null), 1800);
+  const handleCopyFact = async (id: string, value: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopiedId(id);
+      window.setTimeout(() => setCopiedId(null), 1800);
+    } catch {
+      // Do not show confirmation if writeText fails
+    }
   };
 
   const topMatchDoc = documents?.find((d) => d.zone === 'zone1') ?? documents?.[0];

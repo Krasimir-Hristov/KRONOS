@@ -37,10 +37,14 @@ export const ChatDocumentSplitViewer: React.FC<ChatDocumentSplitViewerProps> = (
     return null;
   }
 
-  const handleCopyValue = (key: string, val: string) => {
-    void navigator.clipboard.writeText(val);
-    setCopiedKey(key);
-    window.setTimeout(() => setCopiedKey(null), 1600);
+  const handleCopyValue = async (key: string, val: string) => {
+    try {
+      await navigator.clipboard.writeText(val);
+      setCopiedKey(key);
+      window.setTimeout(() => setCopiedKey(null), 1600);
+    } catch {
+      // Do not set copiedKey if writeText fails
+    }
   };
 
   return (
@@ -213,10 +217,12 @@ export const ChatDocumentSplitViewer: React.FC<ChatDocumentSplitViewerProps> = (
         </Link>
         <button
           type="button"
-          aria-label={`Свали ${activeDoc.title}`}
-          className="cursor-pointer inline-flex items-center gap-1.5 rounded-xl border border-zinc-700 bg-[#0d1722] px-3 py-2 text-xs font-bold text-zinc-200 hover:border-teal-500/40 hover:text-white"
+          disabled
+          aria-label={`Свалянето на ${activeDoc.title} е налично за реални файлове в Документен Сейф`}
+          title="Свалянето е налично за реални файлове в Документен Сейф (демо преглед)"
+          className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-800 bg-[#0d1722]/50 px-3 py-2 text-xs font-bold text-zinc-500 cursor-not-allowed opacity-60"
         >
-          <Download className="h-3.5 w-3.5 text-teal-400" aria-hidden="true" />
+          <Download className="h-3.5 w-3.5 text-zinc-500" aria-hidden="true" />
           <span>Свали оригинал (.PDF)</span>
         </button>
       </footer>

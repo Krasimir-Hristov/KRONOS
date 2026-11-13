@@ -25,6 +25,7 @@ interface DocumentsWorkspaceProps {
   readonly initialReviewQueue?: readonly CatalogDocumentItem[];
   readonly initialLoadError?: string | null;
   readonly initialPreviewDocId?: string | null;
+  readonly isDemo?: boolean;
 }
 
 export const DocumentsWorkspace: React.FC<DocumentsWorkspaceProps> = ({
@@ -32,10 +33,11 @@ export const DocumentsWorkspace: React.FC<DocumentsWorkspaceProps> = ({
   initialReviewQueue,
   initialLoadError = null,
   initialPreviewDocId,
+  isDemo = false,
 }) => {
   const t = useTranslations('documents');
   const uploadQueue = useBulkUploadQueue();
-  const catalog = useDocumentsCatalog(initialCatalog, initialReviewQueue);
+  const catalog = useDocumentsCatalog(initialCatalog, initialReviewQueue, isDemo);
 
   const initialMatch = initialPreviewDocId
     ? [...(initialCatalog ?? []), ...(initialReviewQueue ?? [])].find(

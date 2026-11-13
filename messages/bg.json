@@ -32,7 +32,19 @@
     "mainMenu": "Главно меню",
     "mobileMenu": "Мобилна навигация",
     "lockError": "Неуспешно заключване. Моля, опитайте отново.",
-    "signOutError": "Неуспешен изход. Моля, опитайте отново."
+    "signOutError": "Неуспешен изход. Моля, опитайте отново.",
+    "newChat": "+ Нов разговор",
+    "newChatAria": "Започни нов разговор",
+    "coreModules": "Основни Модули (UI Преглед)",
+    "recentChats": "Последни разговори",
+    "subagentsInactive": "AI Субагенти (Неактивни)",
+    "openSidebar": "Отвори страничното меню",
+    "closeSidebar": "Затвори страничното меню",
+    "subagentAntrag": "Генератор на Молби (Antrag)",
+    "subagentWiderspruch": "Официални Възражения (DE)",
+    "subagentScanner": "Мобилен Скенер ➔ 1 PDF",
+    "subagentSoon": "СКОРО",
+    "subagentHint": "Неактивен линк (визуален преглед)"
   },
   "auth": {
     "loginTitle": "Вход в KRONOS",

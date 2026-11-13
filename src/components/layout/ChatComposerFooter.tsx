@@ -39,18 +39,18 @@ export const ChatComposerFooter: React.FC<ChatComposerFooterProps> = ({
         }`}
       >
         <div className="flex items-center gap-1.5 sm:gap-2">
-          {/* Attachment button */}
+          {/* Attachment button (Demo indicator) */}
           <button
             type="button"
-            disabled={isThinking}
-            aria-label="Прикачи PDF или снимка (Ctrl+V)"
-            title="Прикачи документ (PDF или снимка)"
-            className="cursor-pointer flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-zinc-800 bg-[#080e14] text-zinc-400 transition-colors hover:border-teal-500/40 hover:text-teal-300 disabled:cursor-not-allowed disabled:opacity-40"
+            disabled
+            aria-label="Прикачи PDF или снимка (демо режим)"
+            title="Прикачване (демонстрационен режим — очаквайте в следваща фаза)"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-zinc-800/60 bg-[#080e14]/50 text-zinc-600 cursor-not-allowed opacity-60"
           >
             <Paperclip className="h-4 w-4" aria-hidden="true" />
           </button>
 
-          {/* Input text field */}
+          {/* Input text field (16px text-base on mobile to avoid zoom) */}
           <input
             type="text"
             value={promptText}
@@ -59,30 +59,30 @@ export const ChatComposerFooter: React.FC<ChatComposerFooterProps> = ({
             placeholder={
               isThinking
                 ? 'KRONOS мисли в момента — изчакайте завършване на анализа...'
-                : 'Задайте въпрос, поставете скрийншот (Ctrl+V) или качете формуляр...'
+                : 'Задайте въпрос към KRONOS AI...'
             }
             aria-label="Текст на въпроса"
-            className="w-full min-w-0 bg-transparent px-2 py-1.5 text-xs text-zinc-100 placeholder:text-zinc-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
+            className="w-full min-w-0 bg-transparent px-2 py-1.5 text-base text-zinc-100 placeholder:text-zinc-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
           />
 
-          {/* Dictation / Microphone button */}
+          {/* Dictation / Microphone button (Demo indicator) */}
           <button
             type="button"
-            disabled={isThinking}
-            aria-label="Гласово въвеждане (Диктуване)"
-            title="Диктуване с глас"
-            className="cursor-pointer flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-zinc-800 bg-[#080e14] text-zinc-400 transition-colors hover:border-teal-500/40 hover:text-teal-300 disabled:cursor-not-allowed disabled:opacity-40"
+            disabled
+            aria-label="Гласово въвеждане / Диктуване (демо режим)"
+            title="Диктуване с глас (демонстрационен режим — очаквайте в следваща фаза)"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-zinc-800/60 bg-[#080e14]/50 text-zinc-600 cursor-not-allowed opacity-60"
           >
             <Mic className="h-4 w-4" aria-hidden="true" />
           </button>
 
-          {/* Live Voice Conversation button */}
+          {/* Live Voice Conversation button (Demo indicator) */}
           <button
             type="button"
-            disabled={isThinking}
-            aria-label="Гласов разговор на живо"
-            title="Разговор на живо с KRONOS"
-            className="cursor-pointer flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-teal-500/35 bg-teal-500/10 text-teal-300 transition-colors hover:border-teal-400 hover:bg-teal-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+            disabled
+            aria-label="Гласов разговор на живо (демо режим)"
+            title="Разговор на живо (демонстрационен режим — очаквайте в следваща фаза)"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-teal-950/60 bg-teal-950/20 text-teal-800 cursor-not-allowed opacity-60"
           >
             <AudioLines className="h-4 w-4" aria-hidden="true" />
           </button>
@@ -102,7 +102,7 @@ export const ChatComposerFooter: React.FC<ChatComposerFooterProps> = ({
         <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-zinc-800/70 px-2 pt-1.5 text-[10px] text-zinc-400">
           <span className="inline-flex items-center gap-1 text-teal-300 font-semibold">
             <Sparkles className="h-3 w-3 text-teal-400" aria-hidden="true" />
-            Диктуване • Разговор на живо • Чат с писане
+            Чат с KRONOS AI
           </span>
           <span className="inline-flex items-center gap-1 font-mono text-emerald-400">
             <ShieldCheck className="h-3 w-3" aria-hidden="true" />

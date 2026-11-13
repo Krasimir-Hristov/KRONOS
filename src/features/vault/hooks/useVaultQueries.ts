@@ -6,6 +6,8 @@ import {
   createVaultSecretAction,
   deleteVaultFactAction,
   deleteVaultSecretAction,
+  fetchVaultFactsAction,
+  fetchVaultSecretsAction,
   revealVaultSecretAction,
   updateVaultFactAction,
   updateVaultSecretAction,
@@ -25,24 +27,42 @@ export const VAULT_QUERY_KEYS = {
 };
 
 export const useVaultFactsQuery = (
-  initialFacts: readonly VaultFactItem[] = MOCK_VAULT_FACTS
+  initialFacts: readonly VaultFactItem[] = MOCK_VAULT_FACTS,
+  isDemo = false
 ) => {
   return useQuery({
     queryKey: VAULT_QUERY_KEYS.facts,
-    staleTime: Number.POSITIVE_INFINITY,
-    queryFn: async () => initialFacts,
+    staleTime: 30_000,
+    queryFn: async () => {
+      if (isDemo) return initialFacts;
+      const res = await fetchVaultFactsAction();
+      if (!res.ok) throw new Error(res.errorMessage);
+      return res.data;
+    },
     initialData: initialFacts,
   });
 };
 
-export const useVaultSecretsQuery = (enabled: boolean, _onStepUpRequired: () => void) => {
+export const useVaultSecretsQuery = (
+  enabled: boolean,
+  onStepUpRequired: () => void,
+  isDemo = false
+) => {
   return useQuery({
     queryKey: VAULT_QUERY_KEYS.secrets,
     enabled,
-    staleTime: Number.POSITIVE_INFINITY,
+    staleTime: 30_000,
     retry: false,
-    queryFn: async () => MOCK_VAULT_SECRETS,
-    initialData: MOCK_VAULT_SECRETS,
+    queryFn: async () => {
+      if (isDemo) return MOCK_VAULT_SECRETS;
+      const res = await fetchVaultSecretsAction();
+      if (!res.ok) {
+        if (res.requiresStepUp) onStepUpRequired();
+        throw new Error(res.errorMessage);
+      }
+      return res.data;
+    },
+    initialData: isDemo ? MOCK_VAULT_SECRETS : undefined,
   });
 };
 
