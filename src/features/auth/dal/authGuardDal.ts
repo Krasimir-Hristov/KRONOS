@@ -6,7 +6,7 @@ import { getCryptoSecrets } from '@/config/envConfig';
 import { PIN_COOKIE_NAME, STEP_UP_PIN_COOKIE_NAME } from '@/proxy';
 import { createServerSupabaseClient } from '@/lib/supabase/supabaseServer';
 import type { ProfileRow } from '@/types/databaseTypes';
-import { verifyEncryptedPinCookie } from './pinCrypto';
+import { getVerifiedPinCookieExpiry, verifyEncryptedPinCookie } from './pinCrypto';
 
 export interface VerifiedAuthContext {
   readonly userId: string;
@@ -125,4 +125,15 @@ export const requireStepUpPin = async (): Promise<VerifiedAuthContext> => {
   }
 
   return context;
+};
+
+export const getStepUpPinExpiryMs = async (userId: string): Promise<number | null> => {
+  try {
+    const cookieStore = await cookies();
+    const stepUpCookie = cookieStore.get(STEP_UP_PIN_COOKIE_NAME)?.value;
+    const { pinSecret } = getCryptoSecrets();
+    return getVerifiedPinCookieExpiry(stepUpCookie, userId, pinSecret, 'step_up');
+  } catch {
+    return null;
+  }
 };

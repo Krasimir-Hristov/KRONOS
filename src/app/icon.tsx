@@ -13,10 +13,13 @@ const Icon = (): ImageResponse =>
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          background: 'linear-gradient(135deg, #06b6d4 0%, #4f46e5 55%, #7c3aed 100%)',
-          color: '#ffffff',
-          fontSize: 300,
+          background: 'radial-gradient(circle at 50% 50%, #0f292a 0%, #070b0e 75%)',
+          border: '16px solid #14b8a6',
+          borderRadius: 112,
+          color: '#2dd4bf',
+          fontSize: 280,
           fontWeight: 900,
+          letterSpacing: '-0.05em',
         }}
       >
         K

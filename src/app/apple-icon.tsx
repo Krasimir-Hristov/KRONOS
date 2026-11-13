@@ -13,9 +13,11 @@ const AppleIcon = (): ImageResponse =>
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          background: 'linear-gradient(135deg, #06b6d4 0%, #4f46e5 55%, #7c3aed 100%)',
-          color: '#ffffff',
-          fontSize: 110,
+          background: 'radial-gradient(circle at 50% 50%, #0f292a 0%, #070b0e 75%)',
+          border: '6px solid #14b8a6',
+          borderRadius: 40,
+          color: '#2dd4bf',
+          fontSize: 104,
           fontWeight: 900,
         }}
       >

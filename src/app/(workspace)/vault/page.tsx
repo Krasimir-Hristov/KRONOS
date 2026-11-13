@@ -1,14 +1,12 @@
 import React from 'react';
 import type { Metadata } from 'next';
-import { cookies } from 'next/headers';
-import { getCryptoSecrets } from '@/config/envConfig';
+import { requireAuthAndPin, getStepUpPinExpiryMs } from '@/features/auth/server';
 import {
-  getVerifiedPinCookieExpiry,
-  requireAuthAndPin,
-} from '@/features/auth/server';
-import { VaultWorkspace, type VaultFactItem } from '@/features/vault';
+  MOCK_VAULT_FACTS,
+  VaultWorkspace,
+  type VaultFactItem,
+} from '@/features/vault';
 import { listVaultFacts } from '@/features/vault/server';
-import { STEP_UP_PIN_COOKIE_NAME } from '@/proxy';
 
 export const metadata: Metadata = {
   title: 'Лични Данни & Криптирани Пароли',
@@ -16,45 +14,50 @@ export const metadata: Metadata = {
     'Сейф за Steuer-ID, IBAN, Kaltmiete и AES-256-GCM криптирани пароли със Step-Up 4-цифрен ПИН.',
 };
 
-const getInitialStepUpExpiry = async (userId: string): Promise<number | null> => {
-  try {
-    const cookieStore = await cookies();
-    const stepUpCookie = cookieStore.get(STEP_UP_PIN_COOKIE_NAME)?.value;
-    const { pinSecret } = getCryptoSecrets();
-    return getVerifiedPinCookieExpiry(stepUpCookie, userId, pinSecret, 'step_up');
-  } catch {
-    return null;
-  }
-};
+interface VaultPageProps {
+  readonly searchParams: Promise<{ readonly demo?: string }>;
+}
 
-const loadInitialVaultFacts = async (): Promise<{
-  readonly initialFacts?: readonly VaultFactItem[];
-  readonly initialLoadError: string | null;
-}> => {
-  try {
-    const initialFacts = await listVaultFacts();
-    return { initialFacts, initialLoadError: null };
-  } catch (err) {
-    console.error('[VaultPage] Failed to load initial facts:', err);
-    return {
-      initialFacts: undefined,
-      initialLoadError: 'Неуспешно зареждане на личните данни от сейфа.',
-    };
-  }
-};
-
-const VaultPage: React.FC = async () => {
-  const { userId } = await requireAuthAndPin();
-  const [stepUpExpiresAtMs, factsResult] = await Promise.all([
-    getInitialStepUpExpiry(userId),
-    loadInitialVaultFacts(),
+const withTimeout = async <T,>(promise: Promise<T>, timeoutMs = 2500): Promise<T> => {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('Времето за връзка към трезора изтече.')), timeoutMs);
+    }),
   ]);
+};
+
+const VaultPage: React.FC<VaultPageProps> = async ({ searchParams }) => {
+  const { userId } = await requireAuthAndPin();
+  const params = await searchParams;
+  const isDemo = params.demo === 'true';
+
+  let initialFacts: readonly VaultFactItem[] = [];
+  let initialLoadError: string | null = null;
+  let initialStepUpExpiresAtMs: number | null = null;
+
+  if (isDemo) {
+    initialFacts = MOCK_VAULT_FACTS;
+  } else {
+    try {
+      initialFacts = await withTimeout(listVaultFacts());
+    } catch (err) {
+      initialLoadError =
+        err instanceof Error ? err.message : 'Грешка при зареждане на личните данни.';
+    }
+    try {
+      initialStepUpExpiresAtMs = await withTimeout(getStepUpPinExpiryMs(userId), 1500);
+    } catch {
+      initialStepUpExpiresAtMs = null;
+    }
+  }
 
   return (
     <VaultWorkspace
-      initialFacts={factsResult.initialFacts}
-      initialLoadError={factsResult.initialLoadError}
-      initialStepUpExpiresAtMs={stepUpExpiresAtMs}
+      initialFacts={initialFacts}
+      initialLoadError={initialLoadError}
+      initialStepUpExpiresAtMs={initialStepUpExpiresAtMs}
+      isDemo={isDemo}
     />
   );
 };

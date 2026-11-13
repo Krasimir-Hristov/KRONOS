@@ -2,8 +2,9 @@ import React from 'react';
 import type { Metadata } from 'next';
 import { requireAuthAndPin } from '@/features/auth/server';
 import {
-  CLASSIC_SEARCH_PAGE_SIZE,
   DocumentsWorkspace,
+  MOCK_CATALOG_DOCUMENTS,
+  MOCK_REVIEW_QUEUE_DOCUMENTS,
   type CatalogDocumentItem,
 } from '@/features/documents';
 import {
@@ -18,58 +19,62 @@ export const metadata: Metadata = {
 };
 
 interface DocumentsPageProps {
-  readonly searchParams: Promise<{ readonly preview?: string }>;
+  readonly searchParams: Promise<{ readonly preview?: string; readonly demo?: string }>;
 }
 
-const loadInitialDocumentsData = async (): Promise<{
-  readonly initialCatalog?: readonly CatalogDocumentItem[];
-  readonly initialReviewQueue?: readonly CatalogDocumentItem[];
-  readonly initialLoadError: string | null;
-}> => {
-  const [catalogResult, reviewResult] = await Promise.allSettled([
-    searchCatalogDocumentsClassic({
-      query: '',
-      sortBy: 'doc_date_desc',
-      limit: CLASSIC_SEARCH_PAGE_SIZE,
-      offset: 0,
+const withTimeout = async <T,>(promise: Promise<T>, timeoutMs = 2500): Promise<T> => {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('Времето за връзка към базата данни изтече.')), timeoutMs);
     }),
-    listReviewQueueDocuments(),
   ]);
-
-  const errors: string[] = [];
-  let initialCatalog: readonly CatalogDocumentItem[] | undefined;
-  let initialReviewQueue: readonly CatalogDocumentItem[] | undefined;
-
-  if (catalogResult.status === 'fulfilled') {
-    initialCatalog = catalogResult.value;
-  } else {
-    console.error('[DocumentsPage] Failed to load initial catalog:', catalogResult.reason);
-    errors.push('Неуспешно зареждане на каталога с документи.');
-  }
-
-  if (reviewResult.status === 'fulfilled') {
-    initialReviewQueue = reviewResult.value;
-  } else {
-    console.error(
-      '[DocumentsPage] Failed to load initial review queue:',
-      reviewResult.reason
-    );
-    errors.push('Неуспешно зареждане на опашката за преглед.');
-  }
-
-  return {
-    initialCatalog,
-    initialReviewQueue,
-    initialLoadError: errors.length > 0 ? errors.join(' ') : null,
-  };
 };
 
 const DocumentsPage: React.FC<DocumentsPageProps> = async ({ searchParams }) => {
   await requireAuthAndPin();
   const params = await searchParams;
   const previewDocId = typeof params.preview === 'string' ? params.preview : null;
-  const { initialCatalog, initialReviewQueue, initialLoadError } =
-    await loadInitialDocumentsData();
+  const isDemo = params.demo === 'true';
+
+  let initialCatalog: readonly CatalogDocumentItem[] = [];
+  let initialReviewQueue: readonly CatalogDocumentItem[] = [];
+  let initialLoadError: string | null = null;
+
+  if (isDemo) {
+    initialCatalog = MOCK_CATALOG_DOCUMENTS;
+    initialReviewQueue = MOCK_REVIEW_QUEUE_DOCUMENTS;
+  } else {
+    const [catalogResult, reviewResult] = await Promise.allSettled([
+      withTimeout(
+        searchCatalogDocumentsClassic({
+          query: '',
+          sortBy: 'doc_date_desc',
+          limit: 50,
+          offset: 0,
+        })
+      ),
+      withTimeout(listReviewQueueDocuments()),
+    ]);
+
+    if (catalogResult.status === 'fulfilled') {
+      initialCatalog = catalogResult.value;
+    } else {
+      initialLoadError =
+        catalogResult.reason instanceof Error
+          ? catalogResult.reason.message
+          : 'Грешка при зареждане на каталога с документи.';
+    }
+
+    if (reviewResult.status === 'fulfilled') {
+      initialReviewQueue = reviewResult.value;
+    } else if (!initialLoadError) {
+      initialLoadError =
+        reviewResult.reason instanceof Error
+          ? reviewResult.reason.message
+          : 'Грешка при зареждане на опашката за одобрение.';
+    }
+  }
 
   return (
     <DocumentsWorkspace
@@ -77,6 +82,7 @@ const DocumentsPage: React.FC<DocumentsPageProps> = async ({ searchParams }) => 
       initialReviewQueue={initialReviewQueue}
       initialLoadError={initialLoadError}
       initialPreviewDocId={previewDocId}
+      isDemo={isDemo}
     />
   );
 };

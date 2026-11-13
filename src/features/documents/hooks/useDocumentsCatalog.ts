@@ -24,17 +24,54 @@ import {
   type DocumentTopic,
   type UpdateDocumentMetaInput,
 } from '../schemas/documentSchema';
+import {
+  MOCK_CATALOG_DOCUMENTS,
+  MOCK_REVIEW_QUEUE_DOCUMENTS,
+} from '../utils/mockDocumentsCatalog';
 import { useDocumentBulkExport } from './useDocumentBulkExport';
 
 export const DOCUMENTS_QUERY_KEYS = {
-  catalog: (query: string, topic: string, sortBy: DocumentSortMode) =>
-    ['documents', 'catalog', query, topic, sortBy] as const,
-  reviewQueue: ['documents', 'reviewQueue'] as const,
+  catalog: (
+    query: string,
+    topic: string,
+    sortBy: DocumentSortMode,
+    isDemo: boolean
+  ) => ['documents', 'catalog', query, topic, sortBy, isDemo ? 'demo' : 'live'] as const,
+  reviewQueue: (isDemo: boolean) =>
+    ['documents', 'reviewQueue', isDemo ? 'demo' : 'live'] as const,
+};
+
+const sortCatalogItems = (
+  items: readonly CatalogDocumentItem[],
+  sort: DocumentSortMode
+): readonly CatalogDocumentItem[] => {
+  return [...items].sort((a, b) => {
+    switch (sort) {
+      case 'doc_date_desc': {
+        const da = a.docDate ?? a.createdAt;
+        const db = b.docDate ?? b.createdAt;
+        return db.localeCompare(da);
+      }
+      case 'doc_date_asc': {
+        const da = a.docDate ?? a.createdAt;
+        const db = b.docDate ?? b.createdAt;
+        return da.localeCompare(db);
+      }
+      case 'created_at_desc':
+        return b.createdAt.localeCompare(a.createdAt);
+      case 'created_at_asc':
+        return a.createdAt.localeCompare(b.createdAt);
+      case 'relevance':
+      default:
+        return 0;
+    }
+  });
 };
 
 export const useDocumentsCatalog = (
-  initialCatalog?: readonly CatalogDocumentItem[],
-  initialReviewQueue?: readonly CatalogDocumentItem[]
+  initialCatalog: readonly CatalogDocumentItem[] = MOCK_CATALOG_DOCUMENTS,
+  initialReviewQueue: readonly CatalogDocumentItem[] = MOCK_REVIEW_QUEUE_DOCUMENTS,
+  isDemo = false
 ) => {
   const queryClient = useQueryClient();
   const [searchInput, setSearchInput] = useState('');
@@ -46,16 +83,11 @@ export const useDocumentsCatalog = (
   useEffect(() => {
     const timer = window.setTimeout(() => {
       const next = searchInput.trim();
-      setDebouncedQuery((prev) => {
-        if (prev === next) {
-          return prev;
-        }
-        return next;
-      });
+      setDebouncedQuery((prev) => (prev === next ? prev : next));
       if (next !== debouncedQuery) {
         setSelectedIds([]);
       }
-    }, 250);
+    }, 180);
     return () => window.clearTimeout(timer);
   }, [debouncedQuery, searchInput]);
 
@@ -74,13 +106,28 @@ export const useDocumentsCatalog = (
     setSelectedIds([]);
   }, []);
 
-  const isDefaultFilter =
-    debouncedQuery === '' && topicFilter === '' && sortBy === 'doc_date_desc';
-
   const catalogQuery = useInfiniteQuery({
-    queryKey: DOCUMENTS_QUERY_KEYS.catalog(debouncedQuery, topicFilter, sortBy),
+    queryKey: DOCUMENTS_QUERY_KEYS.catalog(debouncedQuery, topicFilter, sortBy, isDemo),
     initialPageParam: 0,
-    queryFn: async ({ pageParam }) => {
+    staleTime: 30_000,
+    queryFn: async ({ pageParam = 0 }) => {
+      if (isDemo) {
+        const q = debouncedQuery.toLowerCase();
+        const filtered = initialCatalog.filter((doc) => {
+          if (topicFilter && doc.topic !== topicFilter) return false;
+          if (!q) return true;
+          return (
+            doc.title.toLowerCase().includes(q) ||
+            doc.sender.toLowerCase().includes(q) ||
+            doc.summaryText.toLowerCase().includes(q)
+          );
+        });
+        return sortCatalogItems(filtered, sortBy).slice(
+          pageParam,
+          pageParam + CLASSIC_SEARCH_PAGE_SIZE
+        );
+      }
+
       const res = await searchDocumentsClassicAction({
         query: debouncedQuery,
         topic: topicFilter || undefined,
@@ -88,9 +135,11 @@ export const useDocumentsCatalog = (
         limit: CLASSIC_SEARCH_PAGE_SIZE,
         offset: pageParam,
       });
+
       if (!res.ok) {
         throw new Error(res.errorMessage);
       }
+
       return res.data;
     },
     getNextPageParam: (lastPage, allPages) => {
@@ -100,7 +149,7 @@ export const useDocumentsCatalog = (
       return allPages.reduce((sum, page) => sum + page.length, 0);
     },
     initialData:
-      isDefaultFilter && initialCatalog !== undefined
+      debouncedQuery === '' && topicFilter === '' && sortBy === 'doc_date_desc'
         ? {
             pages: [initialCatalog],
             pageParams: [0],
@@ -108,18 +157,32 @@ export const useDocumentsCatalog = (
         : undefined,
   });
 
-  const catalogItems = useMemo(
-    () => catalogQuery.data?.pages.flat() ?? [],
-    [catalogQuery.data]
-  );
+  const catalogItems = useMemo(() => {
+    const rawPages = catalogQuery.data?.pages?.flat();
+    const source = rawPages !== undefined ? rawPages : initialCatalog;
+    if (isDemo) {
+      const q = debouncedQuery.toLowerCase();
+      const filtered = source.filter((doc) => {
+        if (topicFilter && doc.topic !== topicFilter) return false;
+        if (!q) return true;
+        return (
+          doc.title.toLowerCase().includes(q) ||
+          doc.sender.toLowerCase().includes(q) ||
+          doc.summaryText.toLowerCase().includes(q)
+        );
+      });
+      return sortCatalogItems(filtered, sortBy);
+    }
+    return source;
+  }, [catalogQuery.data?.pages, initialCatalog, debouncedQuery, topicFilter, sortBy, isDemo]);
 
   const reviewQueueQuery = useQuery({
-    queryKey: DOCUMENTS_QUERY_KEYS.reviewQueue,
+    queryKey: DOCUMENTS_QUERY_KEYS.reviewQueue(isDemo),
+    staleTime: 30_000,
     queryFn: async () => {
+      if (isDemo) return initialReviewQueue;
       const res = await fetchReviewQueueAction();
-      if (!res.ok) {
-        throw new Error(res.errorMessage);
-      }
+      if (!res.ok) throw new Error(res.errorMessage);
       return res.data;
     },
     initialData: initialReviewQueue,
@@ -128,15 +191,12 @@ export const useDocumentsCatalog = (
   const invalidateAll = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: ['documents'] });
     await queryClient.invalidateQueries({ queryKey: VAULT_QUERY_KEYS.facts });
-    await queryClient.invalidateQueries({ queryKey: ['assistant', 'workspace'] });
   }, [queryClient]);
 
   const approveBatchMutation = useMutation({
     mutationFn: async (items: readonly ApproveDocumentItemInput[]) => {
       const res = await approveDocumentsBatchAction({ items });
-      if (!res.ok) {
-        throw new Error(res.errorMessage);
-      }
+      if (!res.ok) throw new Error(res.errorMessage);
       return res.data;
     },
     onSuccess: invalidateAll,
@@ -145,9 +205,7 @@ export const useDocumentsCatalog = (
   const retryOcrMutation = useMutation({
     mutationFn: async (documentId: string) => {
       const res = await processDocumentOcrAction({ id: documentId });
-      if (!res.ok) {
-        throw new Error(res.errorMessage);
-      }
+      if (!res.ok) throw new Error(res.errorMessage);
       return res.data;
     },
     onSuccess: invalidateAll,
@@ -156,9 +214,7 @@ export const useDocumentsCatalog = (
   const updateMetaMutation = useMutation({
     mutationFn: async (input: UpdateDocumentMetaInput) => {
       const res = await updateDocumentMetaAction(input);
-      if (!res.ok) {
-        throw new Error(res.errorMessage);
-      }
+      if (!res.ok) throw new Error(res.errorMessage);
     },
     onSuccess: invalidateAll,
   });
@@ -166,9 +222,7 @@ export const useDocumentsCatalog = (
   const purgeMutation = useMutation({
     mutationFn: async (ids: readonly string[]) => {
       const res = await purgeDocumentsAction({ ids });
-      if (!res.ok) {
-        throw new Error(res.errorMessage);
-      }
+      if (!res.ok) throw new Error(res.errorMessage);
       return res.data;
     },
     onSuccess: async (_, purgedIds) => {
