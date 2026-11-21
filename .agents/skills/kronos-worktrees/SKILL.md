@@ -23,11 +23,13 @@ description: Operational playbook for orchestrating KRONOS v2 across 4 isolated 
    - Fast-forward / reset the 4 worktree branches (`wt/frontend`, `wt/backend`, `wt/testing`, `wt/security`) onto the Contract commit.
 2. **Parallel Execution:**
    - Dispatch tasks to each agent strictly inside its owned paths.
-   - Each agent reads `AGENTS.md` and relevant `.agents/skills/*/SKILL.md` first.
-3. **Unified Merge & Phase Gate (Orchestrator):**
+   - Each agent MUST read `AGENTS.md`, `.agents/skills/kronos-lessons/SKILL.md`, and relevant `.agents/skills/*/SKILL.md` first.
+3. **Unified Merge, Pre-PR Security Gate & Phase Gate (Orchestrator):**
    - Merge `wt/backend` -> `wt/frontend` -> `wt/testing` -> `wt/security` into `feat/phase-X-<name>`.
+   - Have **Security Agent** audit the unified diff against `.agents/skills/kronos-lessons/SKILL.md` and `AGENTS.md`.
    - Run `pnpm verify` (`verify:arch`, `typecheck`, `lint`, `test`, `build`) until 0 errors.
-4. **CodeRabbit PR & Educational Debrief:**
+4. **CodeRabbit PR, Lessons Distillation & Educational Debrief:**
    - Push `feat/phase-X-<name>` and open **1 PR to `main`** for CodeRabbit review.
-   - Discuss every CodeRabbit finding 1-by-1 in Bulgarian before applying fixes.
+   - Follow `AGENTS.md` Section 7: summarize all CodeRabbit findings and walk through them 1-by-1 interactively with industry-standard solutions before making edits.
+   - After resolving review findings, the Orchestrator MUST distill recurring lessons (1 concise line per lesson, max 120 lines total) into `.agents/skills/kronos-lessons/SKILL.md`.
    - Deliver the mandatory **Educational Phase Debrief** (file-by-file map, exports/imports/usage, state & security flow).
