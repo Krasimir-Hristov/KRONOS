@@ -107,7 +107,7 @@
    - **Точния списък на Contract-First файловете** (SQL миграция, DB типове, Zod схеми, TypeScript интерфейси, API request/response формати);
    - **Индивидуален брийф (таблица/списък) за всеки от 4-те агента** (`Frontend`, `Backend`, `Testing`, `Security`) — точно кои файлове ще създаде/редактира всеки агент (0 припокриване).
 3. **Contract-First Commit & Преглед:** Едва след одобрение на плана Оркестраторът създава фазовия клон `feat/phase-X-<name>` от `main`, написва и комитва **само Contract-First файловете**, показва ги на потребителя с кликаеми линкове (за бърз преглед) и синхронизира 4-те worktrees (`wt/frontend`, `wt/backend`, `wt/testing`, `wt/security`) върху този commit.
-4. **Паралелно изпълнение от 4-те агента:** Оркестраторът стартира паралелно 4-те агента в техните 4 worktree папки (всеки наследява избрания от потребителя модел, освен ако не е указан друг) със задължителна инструкция да прочетат `AGENTS.md` и `.agents/skills/kronos-lessons/SKILL.md`.
+4. **Паралелно изпълнение от 4-те агента:** Оркестраторът стартира паралелно 4-те агента в техните 4 worktree папки (при `/teamwork` използва автоматично таблицата **„Модели и Fallback при квота“** по-долу; при обикновен чат агентите наследяват активния модел) със задължителна инструкция да прочетат `AGENTS.md` и `.agents/skills/kronos-lessons/SKILL.md`.
 5. **Обединяване, Pre-PR Security Gate & `pnpm verify`:** Оркестраторът мърджва `wt/backend` -> `wt/frontend` -> `wt/testing` -> `wt/security` в `feat/phase-X-<name>`, пуска **Security Agent** да одитира обединения diff по `kronos-lessons/SKILL.md` + `AGENTS.md`, и изпълнява `pnpm verify` до **0 грешки**.
 6. **1 Общ PR към `main`:** Проверка за 0 изтекли тайни -> push -> отваряне на 1 PR към `main` за CodeRabbit.
 7. **Интерактивен CodeRabbit Разбор + `kronos-lessons`:** По Раздел 7 — обобщение + въпросник точка по точка с индустриални решения -> прилагане -> `pnpm verify` -> push -> задължителна дестилация на повтаряемите уроци (1 ред на правило, макс. 250 реда) в `.agents/skills/kronos-lessons/SKILL.md`.
@@ -121,6 +121,18 @@
 | `d:\myProjects\kronos-backend` | `wt/backend` | `src/features/*/dal/**`, `src/features/*/server.ts`, `src/features/departments/**` *(без `components/**` и `hooks/**`)*, `src/app/api/**`, `src/lib/**`, `src/config/**`, `src/proxy.ts`, `supabase/migrations/**` | **Backend Agent:** Строи `server-only` DAL, Route Handlers, `src/proxy.ts`, OpenRouter fallback клиента, LangGraph Supervisor + Scoped отдели, `storageDal`, `AES-256-GCM` и Supabase миграции с RLS. Двойна Zod бариера + `requireAuthAndPin()` навсякъде. |
 | `d:\myProjects\kronos-testing` | `wt/testing` | `src/**/*.test.ts` *(без `src/test/security/**`)*, `src/test/mocks/**` | **Testing Agent:** Пише целенасочени Vitest unit и contract тестове за Zod схеми, криптография, fallback вериги, RAG RRF логика, storage адаптери и LangGraph рутиране (само по изричен план на фазата). |
 | `d:\myProjects\kronos-security` | `wt/security` | `src/test/security/**`, `scripts/verifyArchitecture.mjs` | **Security & Arch Agent:** Одитира и тества CVE-2025-29927 header scrubbing, PIN brute-force / tampering, RLS изолация, забрана за изтичане на пароли към AI/вектори, prompt injection защити и автоматизирани архитектурни проверки. |
+
+### Модели по Роли и Автоматичен Fallback при Квота (при `/teamwork`)
+
+> При стартиране в `/teamwork` режим Координаторът автоматично задава тези модели за агентите. Ако агент удари лимит/квота по време на фаза, Координаторът превключва модела му в движение (`model` action, без да го убива и без загуба на контекст) по веригата **Fallback** по-долу:
+
+| Роля | Primary Модел | Fallback Верига при Квота | Бележка |
+| :--- | :--- | :--- | :--- |
+| **Orchestrator** | `Gemini 4 Neon (Extra High / High)` | `Gemini 4 Neon (Medium)` | Планиране (`/plan`), Contract-First, merge, CodeRabbit разбор. |
+| **Frontend Agent** | `Gemini 4 Neon (High)` *(за flagship UI екрани като Chat/Neural Canvas/PIN -> `Extra High`)* | `Gemini 4 Neon (Medium)` -> `Gemini 4 Argon (Medium)` -> `Claude Sonnet 5.5 (Medium)` | Високо дизайнерско качество + пазене на квотата. |
+| **Backend Agent** | `Gemini 4 Neon (High)` | `Gemini 4 Argon (Medium)` -> `Claude Sonnet 5.5 (Medium)` | Критична логика: Supabase RLS, `proxy.ts`, LangGraph, криптография. |
+| **Testing Agent** | `Gemini 4 Hydrogen (Medium)` | `Gemini 3.8 Flash (Medium)` | Икономичен и бърз; резултатите се верифицират обективно от Vitest. |
+| **Security Agent** | `Claude Opus 5.5 (Medium)` | `Claude Sonnet 5.5 (Medium)` -> `Gemini 4 Neon (High)` | Cross-Model Pre-PR одит (втори чифт очи преди CodeRabbit). |
 
 ---
 
