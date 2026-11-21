@@ -10,6 +10,12 @@ reviews:
   poem: false
   review_status: true
   collapse_walkthrough: false
+  path_filters:
+    - "!**/pnpm-lock.yaml"
+    - "!skills-lock.json"
+    - "!.agents/skills/vercel-*/**"
+    - "!.agents/skills/web-design-guidelines/**"
+    - "!.agents/skills/supabase*/**"
   auto_review:
     enabled: true
     drafts: false
