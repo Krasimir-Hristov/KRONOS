@@ -31,5 +31,5 @@ description: Operational playbook for orchestrating KRONOS v2 across 4 isolated 
 4. **CodeRabbit PR, Lessons Distillation & Educational Debrief:**
    - Push `feat/phase-X-<name>` and open **1 PR to `main`** for CodeRabbit review.
    - Follow `AGENTS.md` Section 7: summarize all CodeRabbit findings and walk through them 1-by-1 interactively with industry-standard solutions before making edits.
-   - After resolving review findings, the Orchestrator MUST distill recurring lessons (1 concise line per lesson, max 120 lines total) into `.agents/skills/kronos-lessons/SKILL.md`.
+   - After resolving review findings, the Orchestrator MUST distill recurring lessons (1 concise line per lesson, max 250 lines total) into `.agents/skills/kronos-lessons/SKILL.md`.
    - Deliver the mandatory **Educational Phase Debrief** (file-by-file map, exports/imports/usage, state & security flow).

@@ -1,6 +1,6 @@
 ---
 name: kronos-lessons
-description: Compact curated lessons learned from CodeRabbit PR reviews for KRONOS v2, plus strict self-maintenance rules for the Orchestrator (max 120 lines). ALWAYS load BEFORE coding in a new phase/chat, BEFORE opening a PR (Security Agent Pre-PR Gate), and AFTER resolving CodeRabbit findings.
+description: Compact curated lessons learned from CodeRabbit PR reviews for KRONOS v2, plus strict self-maintenance rules for the Orchestrator (max 250 lines). ALWAYS load BEFORE coding in a new phase/chat, BEFORE opening a PR (Security Agent Pre-PR Gate), and AFTER resolving CodeRabbit findings.
 ---
 
 # KRONOS v2 — Дестилирани Уроци от CodeRabbit (Institutional Memory)
@@ -12,8 +12,8 @@ description: Compact curated lessons learned from CodeRabbit PR reviews for KRON
    - **НИКОГА** не копирай сурови коментари или дълги обяснения от CodeRabbit.
    - Дестилирай всеки повтаряем урок в **1 стегнат ред**: `- **[Област]** Не прави X -> Прави Y *(защо)*`.
    - Еднократни дребни печатни грешки **не** се записват.
-3. **Твърд бюджет (<= 120 реда общо):**
-   - Ако файлът наближи 120 реда, Оркестраторът го **компресира**: слива сходни правила и прехвърля механично проверимите правила директно в `scripts/verifyArchitecture.mjs`, `eslint.config.mjs` или Vitest тестове.
+3. **Твърд бюджет (<= 250 реда общо):**
+   - Ако файлът наближи 250 реда, Оркестраторът го **компресира**: слива сходни правила и прехвърля механично проверимите правила директно в `scripts/verifyArchitecture.mjs`, `eslint.config.mjs` или Vitest тестове.
 4. **Използване при нова фаза / нов чат:**
    - Оркестраторът включва в брийфа на всеки от 4-те worktree агента да прочете `AGENTS.md` и този файл преди писане на код.
    - `Security Agent` минава всички редове по-долу като **Pre-PR Gate** върху обединения diff преди отваряне на PR към CodeRabbit.
