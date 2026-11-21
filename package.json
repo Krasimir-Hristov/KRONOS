@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "verify:arch": "node scripts/verifyArchitecture.mjs",
     "verify": "pnpm verify:arch && pnpm typecheck && pnpm lint && pnpm test && pnpm build"

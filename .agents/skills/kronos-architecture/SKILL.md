@@ -55,7 +55,7 @@ export interface DepartmentDefinition {
 - **Passwords (`vault_items`, `is_secret = true`):** Encrypted via `AES-256-GCM` (unique random IV + Auth Tag). NEVER plaintext in DB, NEVER embedded in `pgvector`, NEVER sent to OpenRouter/LLM. Revealed strictly server -> UI after Step-Up PIN.
 - **Data Retention:** `documents`, `document_chunks`, and `user_memories` are permanent (until explicit Hard Purge). `chat_sessions` / `chat_messages` retained for 1 year (365 days).
 - **Perimeter:** `src/proxy.ts` with CVE-2025-29927 allowlist scrubbing + `requireAuthAndPin()` in every protected DAL and Route Handler.
-- **Next.js 16 `cacheComponents: true`:** Wrap all `cookies()`, `headers()`, `searchParams`, and session reads in `<Suspense>`. Never use `export const dynamic` or top-level session `await` in `layout.tsx`.
+- **Next.js 16 `cacheComponents: true`:** During React rendering (`page.tsx`, `layout.tsx`, Server Components), wrap all `cookies()`, `headers()`, `searchParams`, and session reads in `<Suspense>` (Route Handlers `route.ts` and Server Actions read `await cookies()`/`headers()` directly). Never use `export const dynamic` or top-level session `await` in `layout.tsx`.
 
 ## 5. Verification Command
 

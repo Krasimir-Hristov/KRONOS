@@ -14,7 +14,7 @@
 pnpm dev          # Стартиране на Next.js 16 dev сървър
 pnpm verify       # Пълен Phase Gate: verify:arch + typecheck + lint + test + build
 pnpm verify:arch  # Архитектурен одит (naming, <=300 реда, Arrow Functions, boundaries)
-pnpm typecheck    # TypeScript проверка (tsc --noEmit)
+pnpm typecheck    # Next.js typegen + TypeScript проверка (tsc --noEmit)
 pnpm lint         # ESLint проверка (0 any)
 pnpm test         # Vitest unit & security тестове
 pnpm build        # Production build

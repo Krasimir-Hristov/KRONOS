@@ -9,8 +9,9 @@ Always cross-check breaking changes against `node_modules/next/dist/docs/` befor
 
 ## 1. `cacheComponents: true` Build Rules
 
-1. **Wrap Dynamic Request Reads in `<Suspense>`:**
-   - Reading `cookies()`, `headers()`, `searchParams`, or session data outside a `<Suspense>` boundary causes a build error (`blocking-prerender-runtime`).
+1. **Wrap Dynamic Request Reads in `<Suspense>` (React Rendering Only):**
+   - During **React rendering** (`page.tsx`, `layout.tsx`, Server Components), reading `cookies()`, `headers()`, `searchParams`, or session data outside a `<Suspense>` boundary causes a build error (`blocking-prerender-runtime`).
+   - **Route Handlers (`src/app/api/**/route.ts`) and Server Actions** do NOT render JSX and read `await cookies()` / `await headers()` directly without `<Suspense>`.
    - NEVER `await` auth/session at the top level of `layout.tsx`. Push session checks into an `<AuthGate />` child inside `<Suspense>`.
 2. **Forbidden Legacy Segment Configs:**
    - NEVER export `dynamic`, `revalidate`, or `fetchCache` from pages or layouts — they error when `cacheComponents: true` is enabled.

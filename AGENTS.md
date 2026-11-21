@@ -35,7 +35,7 @@
    - Защита срещу **CVE-2025-29927 (Allowlist Header Scrubbing):** Клонирай `new Headers(request.headers)`, изтривай входящи `x-*` хедъри (задължително `x-middleware-*`), като запазваш единствено allowlist хедърите за Server Actions / Vercel CSRF (`x-forwarded-host`, `x-forwarded-proto`, `x-forwarded-for`, `x-real-ip`), и подавай чистите хедъри през `NextResponse.next({ request: { headers } })`.
    - `proxy.ts` се изпълнява изолирано от render кода — не разчитай на споделени глобални променливи.
 2. **Стриктни Правила за `cacheComponents: true` (`next.config.ts`):**
-   - Всяко четене на динамични request данни (`cookies()`, `headers()`, `searchParams`, потребителска сесия) **ТРЯБВА** да бъде обвито в `<Suspense>` граница; четенето им извън `<Suspense>` причинява build грешка.
+   - При **React рендериране** (`page.tsx`, `layout.tsx`, Server Components) всяко четене на динамични request данни (`cookies()`, `headers()`, `searchParams`, потребителска сесия) **ТРЯБВА** да бъде обвито в `<Suspense>` граница (четенето им извън `<Suspense>` при рендериране причинява build грешка). **Изключение:** Route Handlers (`src/app/api/**/route.ts`) и Server Actions не рендерират JSX и четат `await cookies()` / `await headers()` директно без `<Suspense>`.
    - **Никога** не прави top-level `await` на сесия/бисквитки директно в `layout.tsx` — изнеси проверката в отделен компонент (напр. `<AuthGate />`) вътре в `<Suspense>`.
    - **Забранени** са старите route segment конфигурации `export const dynamic`, `export const revalidate` и `export const fetchCache` (несъвместими с `cacheComponents: true`). Използвай `'use cache'`, `'use cache: private'`, `cacheLife()` и `cacheTag()`.
    - Никога не извиквай `cookies()` или `headers()` вътре в обикновен `'use cache'` — използвай `'use cache: private'` или подай извлечен примитивен `userId` като аргумент.
@@ -104,9 +104,9 @@
 
 | Worktree Папка | Клон | Зона на Собственост (Zero Conflicts) | Роля / Инструкция за Агента |
 | :--- | :--- | :--- | :--- |
-| `d:\myProjects\kronos-frontend` | `wt/frontend` | `src/components/**`, `src/features/*/components/**`, `src/features/*/hooks/**`, `src/app/**/page.tsx`, `src/app/**/layout.tsx`, `messages/*.json` | **Frontend Agent:** Строи достъпни, мобилно-адаптивни React 19 UI компоненти (`PascalCase.tsx`, Arrow Functions, `motion/react`, `bg-linear-to-*`, `next-intl`, `<Suspense>` за `cacheComponents`). Консумира единствено договорите от `schemas/` и API/hooks. Никога не докосва `dal/` или `supabase/`. |
-| `d:\myProjects\kronos-backend` | `wt/backend` | `src/features/*/dal/**`, `src/features/*/server.ts`, `src/features/departments/**`, `src/app/api/**`, `src/lib/**`, `src/config/**`, `src/proxy.ts`, `supabase/migrations/**` | **Backend Agent:** Строи `server-only` DAL, Route Handlers, `src/proxy.ts`, OpenRouter fallback клиента, LangGraph Supervisor + Scoped отдели, `storageDal`, `AES-256-GCM` и Supabase миграции с RLS. Двойна Zod бариера + `requireAuthAndPin()` навсякъде. |
-| `d:\myProjects\kronos-testing` | `wt/testing` | `src/**/*.test.ts`, `src/test/mocks/**` | **Testing Agent:** Пише целенасочени Vitest unit и contract тестове за Zod схеми, криптография, fallback вериги, RAG RRF логика, storage адаптери и LangGraph рутиране (само по изричен план на фазата). |
+| `d:\myProjects\kronos-frontend` | `wt/frontend` | `src/components/**`, `src/features/*/components/**`, `src/features/*/hooks/**`, `src/features/departments/*/components/**`, `src/features/departments/*/hooks/**`, `src/app/**/page.tsx`, `src/app/**/layout.tsx`, `messages/*.json` | **Frontend Agent:** Строи достъпни, мобилно-адаптивни React 19 UI компоненти (`PascalCase.tsx`, Arrow Functions, `motion/react`, `bg-linear-to-*`, `next-intl`, `<Suspense>` за `cacheComponents`). Консумира единствено договорите от `schemas/` и API/hooks. Никога не докосва `dal/` или `supabase/`. |
+| `d:\myProjects\kronos-backend` | `wt/backend` | `src/features/*/dal/**`, `src/features/*/server.ts`, `src/features/departments/**` *(без `components/**` и `hooks/**`)*, `src/app/api/**`, `src/lib/**`, `src/config/**`, `src/proxy.ts`, `supabase/migrations/**` | **Backend Agent:** Строи `server-only` DAL, Route Handlers, `src/proxy.ts`, OpenRouter fallback клиента, LangGraph Supervisor + Scoped отдели, `storageDal`, `AES-256-GCM` и Supabase миграции с RLS. Двойна Zod бариера + `requireAuthAndPin()` навсякъде. |
+| `d:\myProjects\kronos-testing` | `wt/testing` | `src/**/*.test.ts` *(без `src/test/security/**`)*, `src/test/mocks/**` | **Testing Agent:** Пише целенасочени Vitest unit и contract тестове за Zod схеми, криптография, fallback вериги, RAG RRF логика, storage адаптери и LangGraph рутиране (само по изричен план на фазата). |
 | `d:\myProjects\kronos-security` | `wt/security` | `src/test/security/**`, `scripts/verifyArchitecture.mjs` | **Security & Arch Agent:** Одитира и тества CVE-2025-29927 header scrubbing, PIN brute-force / tampering, RLS изолация, забрана за изтичане на пароли към AI/вектори, prompt injection защити и автоматизирани архитектурни проверки. |
 
 3. **Обединяване в 1 PR:** Оркестраторът мърджва `wt/backend` -> `wt/frontend` -> `wt/testing` -> `wt/security` в един общ фазов клон, изпълнява `pnpm verify` до 0 грешки и отваря **1 PR към `main` за CodeRabbit**.
@@ -116,20 +116,24 @@
 ## 6. Задължителен Phase Gate (`pnpm verify`)
 
 Нито една фаза или PR не се счита за завършена, докато `pnpm verify` не премине с **0 грешки**:
-1. `pnpm verify:arch` — автоматична проверка на архитектурата (`scripts/verifyArchitecture.mjs`: забрана за `middleware.ts`, лимит 300 реда, `PascalCase.tsx` / `camelCase.ts`, Arrow Functions за компоненти, без `bg-gradient-to-*`, без cross-feature deep imports).
-2. `pnpm typecheck` — `tsc --noEmit`.
+1. `pnpm verify:arch` — автоматична проверка на архитектурата (`scripts/verifyArchitecture.mjs`: забрана за `middleware.ts`, лимит 300 реда вкл. `.css`, `PascalCase.tsx` / `camelCase.ts`, Arrow Functions за компоненти, без `bg-gradient-to-*`, без cross-feature deep imports — aliased и относителни).
+2. `pnpm typecheck` — `next typegen && tsc --noEmit`.
 3. `pnpm lint` — `eslint` (със забрана за `any`).
 4. `pnpm test` — `vitest run` (преминава и при 0 теста в Фаза 0 чрез `--passWithNoTests`).
 5. `pnpm build` — успешен production build на Next.js 16 (`cacheComponents: true`).
 
 ---
 
-## 7. Закон за CodeRabbit & PR Review
+## 7. Закон за CodeRabbit & PR Review (Интерактивен Разбор по Индустриални Стандарти)
 
-При постъпили бележки от CodeRabbit или външно ревю:
-1. **Забрана за автоматично пакетно поправяне:** Никога не се правят автоматични корекции и push без предварително обсъждане.
-2. **Бележка по бележка на български:** Всяка точка се разяснява ясно на български с контекст от архитектурата и се решава **заедно с потребителя**.
-3. **Едва след одобрение:** Нанася се минималната уговорена корекция, минава `pnpm verify` и чак тогава се пушва към PR-а.
+При постъпили бележки от CodeRabbit или външно ревю Оркестраторът спазва следния строг протокол:
+1. **Абсолютна забрана за тихо/автоматично поправяне:** Никога не се нанасят корекции и не се пушва код преди бележките да бъдат прочетени внимателно и обсъдени с потребителя.
+2. **Кратко общо обобщение (Summary):** Първо се представя стегнат списък на всички отбелязани проблеми (разделени на реални проблеми vs дребни/фалшиви тревоги), за да има пълна картина.
+3. **Разбор бележка по бележка (като интерактивен въпросник):** За всяка бележка поотделно Оркестраторът обяснява на български (стегнато, но детайлно и по същество):
+   - **Какъв е реалният проблем** (конкретен файл, ред и риск);
+   - **Защо е важно** (реалното влияние върху сигурност, надеждност, архитектура или производителност);
+   - **Няколко конкретни решения, базирани на реални IT индустриални стандарти** (никога „набързо“ или временни кръпки), с ясно обоснована препоръка `(Recommended)` и опция „Игнорираме / Отлагаме“, когато е уместно.
+4. **Изпълнение едва след избор на потребителя:** Едва след като всички точки са решени заедно, се прилагат уговорените решения, преминава `pnpm verify` (0 грешки) и чак тогава се пушва към PR-а.
 
 ---
 

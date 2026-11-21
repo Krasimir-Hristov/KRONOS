@@ -131,45 +131,103 @@ const checkTailwindV4Gradients = (filePath, content) => {
   }
 };
 
+const stripLineAndBlockComments = (source) =>
+  source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+
+const normalizeSpecifierToRepoRel = (filePath, specifier) => {
+  if (specifier.startsWith('@/')) {
+    return `src/${specifier.slice(2)}`.replace(/\/+$/, '');
+  }
+  if (specifier.startsWith('./') || specifier.startsWith('../')) {
+    const absTarget = path.resolve(path.dirname(filePath), specifier);
+    return path.relative(ROOT_DIR, absTarget).replace(/\\/g, '/').replace(/\/+$/, '');
+  }
+  return null;
+};
+
+const extractModuleSpecifiers = (content) => {
+  const clean = stripLineAndBlockComments(content);
+  const specifiers = [];
+  const patterns = [
+    /(?:^|;)\s*(?:import|export)\s+(?:type\s+)?[^;]*?\bfrom\s*['"]([^'"]+)['"]/gm,
+    /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
+    /^\s*import\s+['"]([^'"]+)['"]/gm,
+  ];
+  for (const regex of patterns) {
+    let match = regex.exec(clean);
+    while (match !== null) {
+      specifiers.push(match[1]);
+      match = regex.exec(clean);
+    }
+  }
+  return specifiers;
+};
+
 const checkFeatureBoundaries = (filePath, relPath, content) => {
+  const specifiers = extractModuleSpecifiers(content);
+
   // Rule 1: feature index.ts must not use `export *` or re-export server/dal code
   const indexMatch = relPath.match(/^src\/features\/([^/]+)\/index\.ts$/);
   if (indexMatch) {
-    if (/^\s*export\s+\*\s+from\s+/m.test(content)) {
+    const ownFeature = indexMatch[1];
+    if (/^\s*export\s+\*\s+from\s+/m.test(stripLineAndBlockComments(content))) {
       addError(
         filePath,
         'Feature index.ts must use explicit named exports (avoid "export *" for Turbopack tree-shaking).'
       );
     }
-    if (/['"]\.\/(?:dal|server)(?:\/|['"])|['"]server-only['"]/.test(content)) {
-      addError(
-        filePath,
-        'Feature index.ts is client-safe only and must never import or re-export ./dal, ./server, or server-only.'
-      );
+    for (const specifier of specifiers) {
+      if (specifier === 'server-only') {
+        addError(filePath, 'Feature index.ts is client-safe only and must never import server-only.');
+        continue;
+      }
+      const resolvedRel = normalizeSpecifierToRepoRel(filePath, specifier);
+      if (
+        resolvedRel &&
+        (resolvedRel === `src/features/${ownFeature}/server` ||
+          resolvedRel === `src/features/${ownFeature}/server.ts` ||
+          resolvedRel.startsWith(`src/features/${ownFeature}/dal/`))
+      ) {
+        addError(
+          filePath,
+          `Feature index.ts is client-safe only and must never import or re-export "${specifier}".`
+        );
+      }
     }
   }
 
-  // Rule 2: No cross-feature deep imports (allow only @/features/<name> or @/features/<name>/server)
+  // Rule 2: No cross-feature deep imports (aliased @/features/* OR relative ./ and ../)
   const currentFeatureMatch = relPath.match(/^src\/features\/([^/]+)\//);
   const currentFeature = currentFeatureMatch ? currentFeatureMatch[1] : null;
-  const importRegex = /from\s+['"]@\/features\/([^/'"]+)\/([^'"]+)['"]/g;
-  let match = importRegex.exec(content);
-  while (match !== null) {
-    const targetFeature = match[1];
-    const subPath = match[2];
-    if (targetFeature !== currentFeature && subPath !== 'server') {
+
+  for (const specifier of specifiers) {
+    const resolvedRel = normalizeSpecifierToRepoRel(filePath, specifier);
+    if (!resolvedRel) continue;
+
+    const featureTargetMatch = resolvedRel.match(/^src\/features\/([^/]+)(?:\/(.+))?$/);
+    if (!featureTargetMatch) continue;
+
+    const targetFeature = featureTargetMatch[1];
+    const subPath = (featureTargetMatch[2] ?? '').replace(/\.(?:ts|tsx|js|mjs)$/, '');
+    const isPublicEntry = subPath === '' || subPath === 'index' || subPath === 'server';
+
+    if (targetFeature !== currentFeature && !isPublicEntry) {
       addError(
         filePath,
-        `Cross-feature deep import "@/features/${targetFeature}/${subPath}" is forbidden. Import via "@/features/${targetFeature}" or "@/features/${targetFeature}/server".`
+        `Cross-feature deep import "${specifier}" (resolves to "${resolvedRel}") is forbidden. Import via "@/features/${targetFeature}" or "@/features/${targetFeature}/server".`
       );
     }
-    match = importRegex.exec(content);
   }
 };
 
 const checkLegacyNextSegmentConfigs = (filePath, relPath, content) => {
   if (!relPath.startsWith('src/app/')) return;
-  if (/^\s*export\s+const\s+(?:dynamic|revalidate|fetchCache)\s*=/m.test(content)) {
+  const clean = stripLineAndBlockComments(content);
+  const directExportPattern =
+    /^\s*export\s+(?:const|let|var)\s+(?:dynamic|revalidate|fetchCache)\b(?:\s*:\s*[^=]+)?\s*=/m;
+  const namedExportPattern =
+    /^\s*export\s*\{[^}]*\b(?:dynamic|revalidate|fetchCache)\b[^}]*\}/m;
+  if (directExportPattern.test(clean) || namedExportPattern.test(clean)) {
     addError(
       filePath,
       'Legacy route segment config (dynamic/revalidate/fetchCache) is incompatible with Next.js 16 cacheComponents: true. Use "use cache" and <Suspense>.'
@@ -188,9 +246,10 @@ const main = () => {
 
     const content = fs.readFileSync(filePath, 'utf8');
 
+    checkLineLimit(filePath, relPath, content);
+
     if (filePath.endsWith('.ts') || filePath.endsWith('.tsx')) {
       checkFileNaming(filePath, relPath);
-      checkLineLimit(filePath, relPath, content);
       checkArrowComponents(filePath, content);
       checkFeatureBoundaries(filePath, relPath, content);
       checkLegacyNextSegmentConfigs(filePath, relPath, content);

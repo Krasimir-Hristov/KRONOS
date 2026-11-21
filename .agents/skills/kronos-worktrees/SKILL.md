@@ -10,9 +10,9 @@ description: Operational playbook for orchestrating KRONOS v2 across 4 isolated 
 | Folder | Branch | Role | Owned Paths |
 | :--- | :--- | :--- | :--- |
 | `d:\myProjects\kronos` | `feat/phase-X-...` | **Orchestrator** | Contracts (`schemas/`, DB types, migrations), merge, `pnpm verify`, PR to CodeRabbit |
-| `d:\myProjects\kronos-frontend` | `wt/frontend` | **Frontend Agent** | `src/components/**`, `src/features/*/components/**`, `src/features/*/hooks/**`, `src/app/**/page.tsx`, `src/app/**/layout.tsx`, `messages/*.json` |
-| `d:\myProjects\kronos-backend` | `wt/backend` | **Backend Agent** | `src/features/*/dal/**`, `src/features/*/server.ts`, `src/features/departments/**`, `src/app/api/**`, `src/lib/**`, `src/config/**`, `src/proxy.ts`, `supabase/migrations/**` |
-| `d:\myProjects\kronos-testing` | `wt/testing` | **Testing Agent** | `src/**/*.test.ts`, `src/test/mocks/**` |
+| `d:\myProjects\kronos-frontend` | `wt/frontend` | **Frontend Agent** | `src/components/**`, `src/features/*/components/**`, `src/features/*/hooks/**`, `src/features/departments/*/components/**`, `src/features/departments/*/hooks/**`, `src/app/**/page.tsx`, `src/app/**/layout.tsx`, `messages/*.json` |
+| `d:\myProjects\kronos-backend` | `wt/backend` | **Backend Agent** | `src/features/*/dal/**`, `src/features/*/server.ts`, `src/features/departments/**` *(excluding `components/**` and `hooks/**`)*, `src/app/api/**`, `src/lib/**`, `src/config/**`, `src/proxy.ts`, `supabase/migrations/**` |
+| `d:\myProjects\kronos-testing` | `wt/testing` | **Testing Agent** | `src/**/*.test.ts` *(excluding `src/test/security/**`)*, `src/test/mocks/**` |
 | `d:\myProjects\kronos-security` | `wt/security` | **Security Agent** | `src/test/security/**`, `scripts/verifyArchitecture.mjs` |
 
 ## 2. Phase Execution Sequence
