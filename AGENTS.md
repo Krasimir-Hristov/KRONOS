@@ -96,11 +96,24 @@
 
 ---
 
-## 5. Топология на 4-те Git Worktrees & Роли на Агентите (Contract-First)
+## 5. Топология на 4-те Git Worktrees, Роли & Задължителен 8-Стъпков Протокол за Всяка Фаза
 
-Всяка фаза следва строг **Contract-First** ред:
-1. **Оркестратор (`d:\myProjects\kronos`, клон `feat/phase-X-...`):** Фиксира и комитва общите контракти (SQL миграции, DB типове, Zod схеми, TypeScript интерфейси) преди паралелната работа.
-2. **4 Паралелни Изолирани Worktrees (клонове от фазовия клон):**
+> **КРИТИЧНО ПРАВИЛО ЗА ВСЕКИ НОВ ЧАТ:** Потребителят отваря **нов чат за всяка фаза/фийчър**. При подкана от типа *„Направи план за Фаза X“* или *„Започваме Фаза X“* Оркестраторът **НЕ пита как работим** и **НЕ пише код предварително**, а веднага изпълнява следния **8-стъпков протокол** автоматично:
+
+### Задължителен 8-Стъпков Цикъл на Всяка Фаза
+1. **Зареждане на контекст (тихо, преди плана):** Прочети `ROADMAP.md`, `.agents/skills/kronos-lessons/SKILL.md`, `.agents/skills/kronos-architecture/SKILL.md`, `.agents/skills/next-16-cache-components/SKILL.md` и провери реалния статус на кода/базата.
+2. **План на фазата (Артефакт с `Proceed` — НУЛА код преди одобрение!):** Представи структуриран план на български, който **ВИНАГИ** включва:
+   - Точния обхват на фазата и архитектурните решения (по `ROADMAP.md`);
+   - **Точния списък на Contract-First файловете** (SQL миграция, DB типове, Zod схеми, TypeScript интерфейси, API request/response формати);
+   - **Индивидуален брийф (таблица/списък) за всеки от 4-те агента** (`Frontend`, `Backend`, `Testing`, `Security`) — точно кои файлове ще създаде/редактира всеки агент (0 припокриване).
+3. **Contract-First Commit & Преглед:** Едва след одобрение на плана Оркестраторът създава фазовия клон `feat/phase-X-<name>` от `main`, написва и комитва **само Contract-First файловете**, показва ги на потребителя с кликаеми линкове (за бърз преглед) и синхронизира 4-те worktrees (`wt/frontend`, `wt/backend`, `wt/testing`, `wt/security`) върху този commit.
+4. **Паралелно изпълнение от 4-те агента:** Оркестраторът стартира паралелно 4-те агента в техните 4 worktree папки (всеки наследява избрания от потребителя модел, освен ако не е указан друг) със задължителна инструкция да прочетат `AGENTS.md` и `.agents/skills/kronos-lessons/SKILL.md`.
+5. **Обединяване, Pre-PR Security Gate & `pnpm verify`:** Оркестраторът мърджва `wt/backend` -> `wt/frontend` -> `wt/testing` -> `wt/security` в `feat/phase-X-<name>`, пуска **Security Agent** да одитира обединения diff по `kronos-lessons/SKILL.md` + `AGENTS.md`, и изпълнява `pnpm verify` до **0 грешки**.
+6. **1 Общ PR към `main`:** Проверка за 0 изтекли тайни -> push -> отваряне на 1 PR към `main` за CodeRabbit.
+7. **Интерактивен CodeRabbit Разбор + `kronos-lessons`:** По Раздел 7 — обобщение + въпросник точка по точка с индустриални решения -> прилагане -> `pnpm verify` -> push -> задължителна дестилация на повтаряемите уроци (1 ред на правило, макс. 250 реда) в `.agents/skills/kronos-lessons/SKILL.md`.
+8. **Образователен Разбор (По Раздел 8):** Подробна карта файл по файл (кой агент го е писал, какво прави, Exports -> Imports -> Usage, state и сигурност).
+
+### 4 Паралелни Изолирани Worktrees (Зони на Собственост)
 
 | Worktree Папка | Клон | Зона на Собственост (Zero Conflicts) | Роля / Инструкция за Агента |
 | :--- | :--- | :--- | :--- |
@@ -108,8 +121,6 @@
 | `d:\myProjects\kronos-backend` | `wt/backend` | `src/features/*/dal/**`, `src/features/*/server.ts`, `src/features/departments/**` *(без `components/**` и `hooks/**`)*, `src/app/api/**`, `src/lib/**`, `src/config/**`, `src/proxy.ts`, `supabase/migrations/**` | **Backend Agent:** Строи `server-only` DAL, Route Handlers, `src/proxy.ts`, OpenRouter fallback клиента, LangGraph Supervisor + Scoped отдели, `storageDal`, `AES-256-GCM` и Supabase миграции с RLS. Двойна Zod бариера + `requireAuthAndPin()` навсякъде. |
 | `d:\myProjects\kronos-testing` | `wt/testing` | `src/**/*.test.ts` *(без `src/test/security/**`)*, `src/test/mocks/**` | **Testing Agent:** Пише целенасочени Vitest unit и contract тестове за Zod схеми, криптография, fallback вериги, RAG RRF логика, storage адаптери и LangGraph рутиране (само по изричен план на фазата). |
 | `d:\myProjects\kronos-security` | `wt/security` | `src/test/security/**`, `scripts/verifyArchitecture.mjs` | **Security & Arch Agent:** Одитира и тества CVE-2025-29927 header scrubbing, PIN brute-force / tampering, RLS изолация, забрана за изтичане на пароли към AI/вектори, prompt injection защити и автоматизирани архитектурни проверки. |
-
-3. **Обединяване в 1 PR:** Оркестраторът мърджва `wt/backend` -> `wt/frontend` -> `wt/testing` -> `wt/security` в един общ фазов клон, изпълнява `pnpm verify` до 0 грешки и отваря **1 PR към `main` за CodeRabbit**.
 
 ---
 

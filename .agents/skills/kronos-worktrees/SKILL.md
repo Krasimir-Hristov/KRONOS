@@ -15,21 +15,27 @@ description: Operational playbook for orchestrating KRONOS v2 across 4 isolated 
 | `d:\myProjects\kronos-testing` | `wt/testing` | **Testing Agent** | `src/**/*.test.ts` *(excluding `src/test/security/**`)*, `src/test/mocks/**` |
 | `d:\myProjects\kronos-security` | `wt/security` | **Security Agent** | `src/test/security/**`, `scripts/verifyArchitecture.mjs` |
 
-## 2. Phase Execution Sequence
+## 2. Mandatory 8-Step Phase Execution Sequence (Every New Chat)
 
-1. **Contract-First (Orchestrator):**
+When the user starts a new chat for a phase (e.g., "Направи план за Фаза X"), run this exact sequence automatically without asking how the workflow works:
+
+1. **Context Load:** Read `ROADMAP.md`, `.agents/skills/kronos-lessons/SKILL.md`, `.agents/skills/kronos-architecture/SKILL.md`, and `.agents/skills/next-16-cache-components/SKILL.md`.
+2. **Phase Plan Artifact (NO code before approval):** Present a plan with `RequestFeedback: true` listing:
+   - Scope & architectural decisions for the phase;
+   - Exact **Contract-First files** to be created first (SQL migrations, DB types, Zod schemas, TypeScript interfaces, API contracts);
+   - Explicit per-agent **Briefs** (`Frontend`, `Backend`, `Testing`, `Security`) listing exact owned files.
+3. **Contract-First Commit & User Preview (Orchestrator):**
    - Create phase branch `feat/phase-X-<name>` from `main`.
-   - Commit shared Zod schemas, TypeScript interfaces, DB migration + `databaseTypes.ts`.
-   - Fast-forward / reset the 4 worktree branches (`wt/frontend`, `wt/backend`, `wt/testing`, `wt/security`) onto the Contract commit.
-2. **Parallel Execution:**
-   - Dispatch tasks to each agent strictly inside its owned paths.
+   - Commit ONLY the shared Contract-First files, share clickable file links with the user, and fast-forward all 4 worktree branches (`wt/frontend`, `wt/backend`, `wt/testing`, `wt/security`) onto the Contract commit.
+4. **Parallel Execution (4 Agents):**
+   - Dispatch tasks in parallel to the 4 agents inside their owned worktree paths (inheriting the user's selected model unless specified otherwise).
    - Each agent MUST read `AGENTS.md`, `.agents/skills/kronos-lessons/SKILL.md`, and relevant `.agents/skills/*/SKILL.md` first.
-3. **Unified Merge, Pre-PR Security Gate & Phase Gate (Orchestrator):**
+5. **Unified Merge, Pre-PR Security Gate & Phase Gate (Orchestrator):**
    - Merge `wt/backend` -> `wt/frontend` -> `wt/testing` -> `wt/security` into `feat/phase-X-<name>`.
    - Have **Security Agent** audit the unified diff against `.agents/skills/kronos-lessons/SKILL.md` and `AGENTS.md`.
    - Run `pnpm verify` (`verify:arch`, `typecheck`, `lint`, `test`, `build`) until 0 errors.
-4. **CodeRabbit PR, Lessons Distillation & Educational Debrief:**
-   - Push `feat/phase-X-<name>` and open **1 PR to `main`** for CodeRabbit review.
+6. **Unified PR to `main`:** Secret audit (0 leaked credentials) -> push `feat/phase-X-<name>` -> open **1 PR to `main`** for CodeRabbit.
+7. **Interactive CodeRabbit Review & Lessons Distillation:**
    - Follow `AGENTS.md` Section 7: summarize all CodeRabbit findings and walk through them 1-by-1 interactively with industry-standard solutions before making edits.
-   - After resolving review findings, the Orchestrator MUST distill recurring lessons (1 concise line per lesson, max 250 lines total) into `.agents/skills/kronos-lessons/SKILL.md`.
-   - Deliver the mandatory **Educational Phase Debrief** (file-by-file map, exports/imports/usage, state & security flow).
+   - After resolving findings, distill recurring lessons (1 concise line per lesson, max 250 lines total) into `.agents/skills/kronos-lessons/SKILL.md`.
+8. **Educational Phase Debrief:** Deliver `AGENTS.md` Section 8 (file-by-file map, authoring agent, exports -> imports -> usage, state & security flow).
