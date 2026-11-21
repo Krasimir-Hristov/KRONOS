@@ -136,7 +136,11 @@ const stripLineAndBlockComments = (source) =>
 
 const normalizeSpecifierToRepoRel = (filePath, specifier) => {
   if (specifier.startsWith('@/')) {
-    return `src/${specifier.slice(2)}`.replace(/\/+$/, '');
+    const cleanAlias = specifier.slice(2).replace(/\\/g, '/');
+    return path.posix
+      .normalize(`src/${cleanAlias}`)
+      .replace(/^\.\//, '')
+      .replace(/\/+$/, '');
   }
   if (specifier.startsWith('./') || specifier.startsWith('../')) {
     const absTarget = path.resolve(path.dirname(filePath), specifier);
@@ -144,6 +148,10 @@ const normalizeSpecifierToRepoRel = (filePath, specifier) => {
   }
   return null;
 };
+
+const hasAliasParentTraversal = (specifier) =>
+  specifier.startsWith('@/') &&
+  /(?:^|\/)\.\.(?:\/|$)/.test(specifier.slice(2).replace(/\\/g, '/'));
 
 const extractModuleSpecifiers = (content) => {
   const clean = stripLineAndBlockComments(content);
@@ -166,10 +174,19 @@ const extractModuleSpecifiers = (content) => {
 const checkFeatureBoundaries = (filePath, relPath, content) => {
   const specifiers = extractModuleSpecifiers(content);
 
-  // Rule 1: feature index.ts must not use `export *` or re-export server/dal code
+  // Rule 0: Never allow ".." traversal inside "@/" path aliases
+  for (const specifier of specifiers) {
+    if (hasAliasParentTraversal(specifier)) {
+      addError(
+        filePath,
+        `Path traversal ".." inside "@/" alias "${specifier}" is forbidden. Use a clean canonical import path.`
+      );
+    }
+  }
+
+  // Rule 1: feature index.ts must not use `export *` or import/re-export ANY server or dal code
   const indexMatch = relPath.match(/^src\/features\/([^/]+)\/index\.ts$/);
   if (indexMatch) {
-    const ownFeature = indexMatch[1];
     if (/^\s*export\s+\*\s+from\s+/m.test(stripLineAndBlockComments(content))) {
       addError(
         filePath,
@@ -184,13 +201,12 @@ const checkFeatureBoundaries = (filePath, relPath, content) => {
       const resolvedRel = normalizeSpecifierToRepoRel(filePath, specifier);
       if (
         resolvedRel &&
-        (resolvedRel === `src/features/${ownFeature}/server` ||
-          resolvedRel === `src/features/${ownFeature}/server.ts` ||
-          resolvedRel.startsWith(`src/features/${ownFeature}/dal/`))
+        (/^src\/features\/[^/]+\/server(?:\.(?:ts|tsx|js|mjs)|\/|$)/.test(resolvedRel) ||
+          /^src\/features\/[^/]+\/dal(?:\.(?:ts|tsx|js|mjs)|\/|$)/.test(resolvedRel))
       ) {
         addError(
           filePath,
-          `Feature index.ts is client-safe only and must never import or re-export "${specifier}".`
+          `Feature index.ts is client-safe only and must never import or re-export server/dal module "${specifier}" (resolves to "${resolvedRel}").`
         );
       }
     }

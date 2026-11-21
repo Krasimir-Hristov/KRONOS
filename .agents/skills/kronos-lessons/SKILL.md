@@ -29,10 +29,14 @@ description: Compact curated lessons learned from CodeRabbit PR reviews for KRON
 
 ### Архитектура & Граници
 - **[Feature Boundaries]** Не проверявай само `@/features/*` алиаси -> нормализирай и относителните (`./`, `../`) импорти спрямо файла, за да не се заобикалят `index.ts`/`server.ts` *(предпазва клиентския bundle и рефакторинга)*.
+- **[Path Canonicalization]** Не проверявай ненормализирани `@/` алиаси -> винаги `path.posix.normalize(...)` и блокирай `..` вътре в `@/` *(затваря path-traversal пробив като `@/features/a/../b/dal`)*.
+- **[Client Barrel Isolation]** В `index.ts` не блокирай само собствения `server`/`dal/` -> забрани `features/*/server(.ts)` и `features/*/dal(/|$)` за **всеки** feature *(спира теч на `server-only` в клиентски код)*.
 - **[File Size]** Не изключвай `.css` от лимита 300 реда -> прилагай го за `.ts`, `.tsx` и `.css` *(предотвратява монолитен `globals.css`)*.
 
 ### Multi-Agent & Worktrees
 - **[Ownership Globs]** Не допускай припокриващи се пътища между агентите -> всяка зона трябва да е изцяло непресичаща се (`Testing` изключва `src/test/security/**`; `Backend` изключва `components/**` и `hooks/**` в `departments/**`) *(гарантира 0 merge конфликта)*.
+- **[Worktree Sync]** Не разчитай само на `merge --ff-only` след GitHub squash-merge -> първо провери/бекъпни незапазена работа, после `ff-only` или `git switch -C`, и верифицирай SHA на 4-те клона *(0 загубени файлове)*.
+- **[Post-Review Gate]** Дестилирай `kronos-lessons` + пусни Risk-Based Security delta одит (при код/SQL/скриптове) **преди** финалния `pnpm verify` и `push` *(атомарен проверен PR)*.
 
 ### Frontend *(добавяй само повтаряеми уроци от Фаза 1+)*
 - *(няма записани уроци все още)*

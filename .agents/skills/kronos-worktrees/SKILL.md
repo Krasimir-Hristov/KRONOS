@@ -31,23 +31,29 @@ When spawning workers in `/teamwork`, pin each worker to its Primary model autom
 
 When the user starts a new chat for a phase (e.g., "Направи план за Фаза X"), run this exact sequence automatically without asking how the workflow works:
 
-1. **Context Load:** Read `ROADMAP.md`, `.agents/skills/kronos-lessons/SKILL.md`, `.agents/skills/kronos-architecture/SKILL.md`, and `.agents/skills/next-16-cache-components/SKILL.md`.
+1. **Context Load (Ground Truth Over Docs):** Read `ROADMAP.md`, `.agents/skills/kronos-lessons/SKILL.md`, `.agents/skills/kronos-architecture/SKILL.md`, and `.agents/skills/next-16-cache-components/SKILL.md`, **AND** inspect the actual current state of the codebase (`git status`, `git log`, `src/` tree) and database (Supabase tables/migrations) to reconcile real progress against `ROADMAP.md` before planning (never rely on docs alone).
 2. **Phase Plan Artifact (NO code before approval):** Present a plan with `RequestFeedback: true` listing:
-   - Scope & architectural decisions for the phase;
+   - Scope & architectural decisions for the phase (accounting for already-completed code/DB work);
    - Exact **Contract-First files** to be created first (SQL migrations, DB types, Zod schemas, TypeScript interfaces, API contracts);
    - Explicit per-agent **Briefs** (`Frontend`, `Backend`, `Testing`, `Security`) listing exact owned files.
-3. **Contract-First Commit & User Preview (Orchestrator):**
+3. **Contract-First Commit & Safe Zero-Data-Loss Worktree Sync (Orchestrator):**
    - Create phase branch `feat/phase-X-<name>` from `main`.
-   - Commit ONLY the shared Contract-First files, share clickable file links with the user, and fast-forward all 4 worktree branches (`wt/frontend`, `wt/backend`, `wt/testing`, `wt/security`) onto the Contract commit.
+   - Commit ONLY the shared Contract-First files and share clickable file links with the user.
+   - Sync all 4 worktree branches (`wt/frontend`, `wt/backend`, `wt/testing`, `wt/security`) onto the Contract commit `<contract-sha>` safely:
+     1. **Protect work first:** In each worktree, check `git status --porcelain` and any unmerged local commits. If dirty or ahead, preserve work first (`git stash push -u -m "pre-sync-backup"` or create backup branch `backup/wt-<name>-<timestamp>`) — NEVER run blind `reset --hard`.
+     2. **Move branch safely:** Run `git merge --ff-only <contract-sha>`; if fast-forward fails (e.g., diverged history after GitHub Squash & Merge), safely realign the clean worktree branch with `git switch -C wt/<name> <contract-sha>` (or recreate the worktree branch at `<contract-sha>`).
+     3. **Verify alignment:** Run `git rev-parse HEAD` in all 4 worktrees and confirm every branch matches `<contract-sha>`.
 4. **Parallel Execution (4 Agents):**
-   - Dispatch tasks in parallel to the 4 agents inside their owned worktree paths (inheriting the user's selected model unless specified otherwise).
+   - Dispatch tasks in parallel to the 4 agents inside their owned worktree paths (using the Model Roster above in `/teamwork`, or inheriting the active model otherwise).
    - Each agent MUST read `AGENTS.md`, `.agents/skills/kronos-lessons/SKILL.md`, and relevant `.agents/skills/*/SKILL.md` first.
 5. **Unified Merge, Pre-PR Security Gate & Phase Gate (Orchestrator):**
    - Merge `wt/backend` -> `wt/frontend` -> `wt/testing` -> `wt/security` into `feat/phase-X-<name>`.
    - Have **Security Agent** audit the unified diff against `.agents/skills/kronos-lessons/SKILL.md` and `AGENTS.md`.
    - Run `pnpm verify` (`verify:arch`, `typecheck`, `lint`, `test`, `build`) until 0 errors.
 6. **Unified PR to `main`:** Secret audit (0 leaked credentials) -> push `feat/phase-X-<name>` -> open **1 PR to `main`** for CodeRabbit.
-7. **Interactive CodeRabbit Review & Lessons Distillation:**
+7. **Interactive CodeRabbit Review, Lessons Distillation & Risk-Based Security Delta Audit:**
    - Follow `AGENTS.md` Section 7: summarize all CodeRabbit findings and walk through them 1-by-1 interactively with industry-standard solutions before making edits.
-   - After resolving findings, distill recurring lessons (1 concise line per lesson, max 250 lines total) into `.agents/skills/kronos-lessons/SKILL.md`.
+   - Apply approved edits and **distill recurring lessons** (1 concise line per lesson, max 250 lines total) into `.agents/skills/kronos-lessons/SKILL.md` **BEFORE** final verification and push.
+   - **Risk-Based Security Delta Audit (aligned with Step 5):** If post-review edits touch executable code, SQL, scripts, or config (`src/**`, `supabase/**`, `scripts/**`, `package.json`, `next.config.ts`), run a targeted **Security Agent** delta audit on the new diff before `pnpm verify` and `push`. Skip re-audit for docs-only (`*.md`) fixes to preserve quota.
+   - Run `pnpm verify` (0 errors) -> commit all fixes + `kronos-lessons` together -> push to PR.
 8. **Educational Phase Debrief:** Deliver `AGENTS.md` Section 8 (file-by-file map, authoring agent, exports -> imports -> usage, state & security flow).
