@@ -124,15 +124,15 @@
 
 ### Модели по Роли и Автоматичен Fallback при Квота (при `/teamwork`)
 
-> При стартиране в `/teamwork` режим Координаторът автоматично задава тези модели за агентите. Ако агент удари лимит/квота по време на фаза, Координаторът превключва модела му в движение (`model` action, без да го убива и без загуба на контекст) по веригата **Fallback** по-долу:
+> При стартиране в `/teamwork` режим Координаторът автоматично задава тези модели за агентите. Ако агент удари лимит/квота по време на фаза, Координаторът превключва модела му в движение (`model` action, без да го убива и без загуба на контекст) по веригата **Fallback** по-долу. **Важно:** Квотата на даден модел е обща за всичките му нива (`Extra High` / `High` / `Medium`), затова fallback веригата **винаги** преминава към **различен модел** (никога към по-ниско ниво на същия изчерпан модел). За **Backend Agent** никога не се използва `Medium` (само `Extra High` / `High`).
 
-| Роля | Primary Модел | Fallback Верига при Квота | Бележка |
+| Роля | Primary Модел | Fallback Верига при Квота (различен модел) | Бележка |
 | :--- | :--- | :--- | :--- |
-| **Orchestrator** | `Gemini 4 Neon (Extra High / High)` | `Gemini 4 Neon (Medium)` | Планиране (`/plan`), Contract-First, merge, CodeRabbit разбор. |
-| **Frontend Agent** | `Gemini 4 Neon (High)` *(за flagship UI екрани като Chat/Neural Canvas/PIN -> `Extra High`)* | `Gemini 4 Neon (Medium)` -> `Gemini 4 Argon (Medium)` -> `Claude Sonnet 5.5 (Medium)` | Високо дизайнерско качество + пазене на квотата. |
-| **Backend Agent** | `Gemini 4 Neon (Extra High)` *(задължително винаги Extra High)* | `Gemini 4 Neon (High)` -> `Gemini 4 Argon (Medium)` -> `Claude Sonnet 5.5 (Medium)` | Критична логика: Supabase RLS, `proxy.ts`, LangGraph, криптография. |
+| **Orchestrator** | `Gemini 4 Neon (Extra High)` | `Claude Opus 5.5 (High)` -> `Claude Sonnet 5.5 (High)` *(или пауза до рефреш)* | Планиране (`/plan`), Contract-First, merge, CodeRabbit разбор. |
+| **Frontend Agent** | `Gemini 4 Neon (High)` *(за flagship UI екрани като Chat/Neural Canvas/PIN -> `Extra High`)* | `Gemini 4 Argon (High)` -> `Claude Sonnet 5.5 (High)` | Високо дизайнерско качество; при изчерпана Neon квота превключва на друг модел. |
+| **Backend Agent** | `Gemini 4 Neon (Extra High)` *(задължително винаги Extra High)* | `Claude Opus 5.5 (High)` -> `Claude Sonnet 5.5 (High)` *(никога `Medium`!)* | Критична логика: Supabase RLS, `proxy.ts`, LangGraph, криптография — без компромис. |
 | **Testing Agent** | `Gemini 4 Hydrogen (Medium)` | `Gemini 3.8 Flash (Medium)` | Икономичен и бърз; резултатите се верифицират обективно от Vitest. |
-| **Security Agent** | `Claude Opus 5.5 (Medium)` | `Claude Sonnet 5.5 (Medium)` -> `Gemini 4 Neon (High)` | Cross-Model Pre-PR одит (втори чифт очи преди CodeRabbit). |
+| **Security Agent** | `Claude Opus 5.5 (Medium)` | `Claude Sonnet 5.5 (High)` -> `Gemini 4 Neon (High)` | Cross-Model Pre-PR одит (втори чифт очи преди CodeRabbit). |
 
 ---
 

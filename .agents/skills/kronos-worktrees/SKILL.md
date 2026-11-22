@@ -17,15 +17,15 @@ description: Operational playbook for orchestrating KRONOS v2 across 4 isolated 
 
 ### Default Model Roster & Quota Fallback (`/teamwork` / `swarm` mode)
 
-When spawning workers in `/teamwork`, pin each worker to its Primary model automatically (and use `swarm(action="model")` to fall back cleanly without losing context if a worker hits quota):
+When spawning workers in `/teamwork`, pin each worker to its Primary model automatically (and use `swarm(action="model")` to fall back cleanly without losing context if a worker hits quota). **Important:** Quota is shared across reasoning tiers (`Extra High` / `High` / `Medium`) of the same model, so fallbacks ALWAYS switch to a **different model**. **Backend Agent** MUST NEVER drop to `Medium` (only `Extra High` / `High`):
 
-| Role | Primary Model | Quota Fallback Chain |
+| Role | Primary Model | Quota Fallback Chain (different model) |
 | :--- | :--- | :--- |
-| **Orchestrator** | `Gemini 4 Neon (Extra High / High)` | `Gemini 4 Neon (Medium)` |
-| **Frontend Agent** | `Gemini 4 Neon (High)` *(use `Extra High` for flagship UI screens like Chat/Neural Canvas/PIN)* | `Gemini 4 Neon (Medium)` -> `Gemini 4 Argon (Medium)` -> `Claude Sonnet 5.5 (Medium)` |
-| **Backend Agent** | `Gemini 4 Neon (Extra High)` *(mandatory always Extra High)* | `Gemini 4 Neon (High)` -> `Gemini 4 Argon (Medium)` -> `Claude Sonnet 5.5 (Medium)` |
+| **Orchestrator** | `Gemini 4 Neon (Extra High)` | `Claude Opus 5.5 (High)` -> `Claude Sonnet 5.5 (High)` *(or pause until refresh)* |
+| **Frontend Agent** | `Gemini 4 Neon (High)` *(use `Extra High` for flagship UI screens like Chat/Neural Canvas/PIN)* | `Gemini 4 Argon (High)` -> `Claude Sonnet 5.5 (High)` |
+| **Backend Agent** | `Gemini 4 Neon (Extra High)` *(mandatory always Extra High)* | `Claude Opus 5.5 (High)` -> `Claude Sonnet 5.5 (High)` *(never `Medium`!)* |
 | **Testing Agent** | `Gemini 4 Hydrogen (Medium)` | `Gemini 3.8 Flash (Medium)` |
-| **Security Agent** | `Claude Opus 5.5 (Medium)` | `Claude Sonnet 5.5 (Medium)` -> `Gemini 4 Neon (High)` |
+| **Security Agent** | `Claude Opus 5.5 (Medium)` | `Claude Sonnet 5.5 (High)` -> `Gemini 4 Neon (High)` |
 
 ## 2. Mandatory 8-Step Phase Execution Sequence (Every New Chat)
 
