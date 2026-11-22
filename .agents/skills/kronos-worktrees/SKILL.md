@@ -23,7 +23,7 @@ When spawning workers in `/teamwork`, pin each worker to its Primary model autom
 | :--- | :--- | :--- |
 | **Orchestrator** | `Gemini 4 Neon (Extra High / High)` | `Gemini 4 Neon (Medium)` |
 | **Frontend Agent** | `Gemini 4 Neon (High)` *(use `Extra High` for flagship UI screens like Chat/Neural Canvas/PIN)* | `Gemini 4 Neon (Medium)` -> `Gemini 4 Argon (Medium)` -> `Claude Sonnet 5.5 (Medium)` |
-| **Backend Agent** | `Gemini 4 Neon (High)` | `Gemini 4 Argon (Medium)` -> `Claude Sonnet 5.5 (Medium)` |
+| **Backend Agent** | `Gemini 4 Neon (Extra High)` *(mandatory always Extra High)* | `Gemini 4 Neon (High)` -> `Gemini 4 Argon (Medium)` -> `Claude Sonnet 5.5 (Medium)` |
 | **Testing Agent** | `Gemini 4 Hydrogen (Medium)` | `Gemini 3.8 Flash (Medium)` |
 | **Security Agent** | `Claude Opus 5.5 (Medium)` | `Claude Sonnet 5.5 (Medium)` -> `Gemini 4 Neon (High)` |
 

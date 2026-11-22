@@ -130,7 +130,7 @@
 | :--- | :--- | :--- | :--- |
 | **Orchestrator** | `Gemini 4 Neon (Extra High / High)` | `Gemini 4 Neon (Medium)` | Планиране (`/plan`), Contract-First, merge, CodeRabbit разбор. |
 | **Frontend Agent** | `Gemini 4 Neon (High)` *(за flagship UI екрани като Chat/Neural Canvas/PIN -> `Extra High`)* | `Gemini 4 Neon (Medium)` -> `Gemini 4 Argon (Medium)` -> `Claude Sonnet 5.5 (Medium)` | Високо дизайнерско качество + пазене на квотата. |
-| **Backend Agent** | `Gemini 4 Neon (High)` | `Gemini 4 Argon (Medium)` -> `Claude Sonnet 5.5 (Medium)` | Критична логика: Supabase RLS, `proxy.ts`, LangGraph, криптография. |
+| **Backend Agent** | `Gemini 4 Neon (Extra High)` *(задължително винаги Extra High)* | `Gemini 4 Neon (High)` -> `Gemini 4 Argon (Medium)` -> `Claude Sonnet 5.5 (Medium)` | Критична логика: Supabase RLS, `proxy.ts`, LangGraph, криптография. |
 | **Testing Agent** | `Gemini 4 Hydrogen (Medium)` | `Gemini 3.8 Flash (Medium)` | Икономичен и бърз; резултатите се верифицират обективно от Vitest. |
 | **Security Agent** | `Claude Opus 5.5 (Medium)` | `Claude Sonnet 5.5 (Medium)` -> `Gemini 4 Neon (High)` | Cross-Model Pre-PR одит (втори чифт очи преди CodeRabbit). |
 
