@@ -30,7 +30,7 @@ description: Compact curated lessons learned from CodeRabbit PR reviews for KRON
 ### Архитектура & Граници
 - **[Feature Boundaries]** Не проверявай само `@/features/*` алиаси -> нормализирай и относителните (`./`, `../`) импорти спрямо файла, за да не се заобикалят `index.ts`/`server.ts` *(предпазва клиентския bundle и рефакторинга)*.
 - **[Path Canonicalization]** Не проверявай ненормализирани `@/` алиаси -> винаги `path.posix.normalize(...)` и блокирай `..` вътре в `@/` *(затваря path-traversal пробив като `@/features/a/../b/dal`)*.
-- **[Client Barrel Isolation]** В `index.ts` не блокирай само собствения `server`/`dal/` -> забрани `features/*/server(.ts)` и `features/*/dal(/|$)` за **всеки** feature *(спира теч на `server-only` в клиентски код)*.
+- **[Client Barrel Isolation]** В `index.ts` (вкл. вложени `departments/<име>/index.ts`) не блокирай само собствения `server`/`dal/` -> забрани `server(.ts)` и `dal(/|$)` за **всеки** feature/department *(спира теч на `server-only` в клиентски код)*.
 - **[File Size]** Не изключвай `.css` от лимита 300 реда -> прилагай го за `.ts`, `.tsx` и `.css` *(предотвратява монолитен `globals.css`)*.
 
 ### Multi-Agent & Worktrees

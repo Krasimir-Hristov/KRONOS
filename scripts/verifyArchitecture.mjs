@@ -171,8 +171,20 @@ const extractModuleSpecifiers = (content) => {
   return specifiers;
 };
 
+const parseFeaturePath = (relPath) => {
+  const deptMatch = relPath.match(/^src\/features\/(departments\/[^/.]+)(?:\/(.+))?$/);
+  if (deptMatch) {
+    return { featureKey: deptMatch[1], subPath: deptMatch[2] ?? '' };
+  }
+  const match = relPath.match(/^src\/features\/([^/]+)(?:\/(.+))?$/);
+  if (!match) return null;
+  return { featureKey: match[1], subPath: match[2] ?? '' };
+};
+
 const checkFeatureBoundaries = (filePath, relPath, content) => {
   const specifiers = extractModuleSpecifiers(content);
+  const currentFeatureInfo = parseFeaturePath(relPath);
+  const currentFeature = currentFeatureInfo?.featureKey ?? null;
 
   // Rule 0: Never allow ".." traversal inside "@/" path aliases
   for (const specifier of specifiers) {
@@ -184,9 +196,8 @@ const checkFeatureBoundaries = (filePath, relPath, content) => {
     }
   }
 
-  // Rule 1: feature index.ts must not use `export *` or import/re-export ANY server or dal code
-  const indexMatch = relPath.match(/^src\/features\/([^/]+)\/index\.ts$/);
-  if (indexMatch) {
+  // Rule 1: feature/department index.ts must not use `export *` or import/re-export ANY server or dal code
+  if (currentFeatureInfo?.subPath === 'index.ts') {
     if (/^\s*export\s+\*\s+from\s+/m.test(stripLineAndBlockComments(content))) {
       addError(
         filePath,
@@ -199,11 +210,8 @@ const checkFeatureBoundaries = (filePath, relPath, content) => {
         continue;
       }
       const resolvedRel = normalizeSpecifierToRepoRel(filePath, specifier);
-      if (
-        resolvedRel &&
-        (/^src\/features\/[^/]+\/server(?:\.(?:ts|tsx|js|mjs)|\/|$)/.test(resolvedRel) ||
-          /^src\/features\/[^/]+\/dal(?:\.(?:ts|tsx|js|mjs)|\/|$)/.test(resolvedRel))
-      ) {
+      const targetInfo = resolvedRel ? parseFeaturePath(resolvedRel) : null;
+      if (targetInfo && /^(?:server|dal)(?:\.(?:ts|tsx|js|mjs)|\/|$)/.test(targetInfo.subPath)) {
         addError(
           filePath,
           `Feature index.ts is client-safe only and must never import or re-export server/dal module "${specifier}" (resolves to "${resolvedRel}").`
@@ -212,25 +220,19 @@ const checkFeatureBoundaries = (filePath, relPath, content) => {
     }
   }
 
-  // Rule 2: No cross-feature deep imports (aliased @/features/* OR relative ./ and ../)
-  const currentFeatureMatch = relPath.match(/^src\/features\/([^/]+)\//);
-  const currentFeature = currentFeatureMatch ? currentFeatureMatch[1] : null;
-
+  // Rule 2: No cross-feature/department deep imports (aliased @/features/* OR relative ./ and ../)
   for (const specifier of specifiers) {
     const resolvedRel = normalizeSpecifierToRepoRel(filePath, specifier);
-    if (!resolvedRel) continue;
+    const targetInfo = resolvedRel ? parseFeaturePath(resolvedRel) : null;
+    if (!targetInfo) continue;
 
-    const featureTargetMatch = resolvedRel.match(/^src\/features\/([^/]+)(?:\/(.+))?$/);
-    if (!featureTargetMatch) continue;
+    const cleanSubPath = targetInfo.subPath.replace(/\.(?:ts|tsx|js|mjs)$/, '');
+    const isPublicEntry = cleanSubPath === '' || cleanSubPath === 'index' || cleanSubPath === 'server';
 
-    const targetFeature = featureTargetMatch[1];
-    const subPath = (featureTargetMatch[2] ?? '').replace(/\.(?:ts|tsx|js|mjs)$/, '');
-    const isPublicEntry = subPath === '' || subPath === 'index' || subPath === 'server';
-
-    if (targetFeature !== currentFeature && !isPublicEntry) {
+    if (targetInfo.featureKey !== currentFeature && !isPublicEntry) {
       addError(
         filePath,
-        `Cross-feature deep import "${specifier}" (resolves to "${resolvedRel}") is forbidden. Import via "@/features/${targetFeature}" or "@/features/${targetFeature}/server".`
+        `Cross-feature deep import "${specifier}" (resolves to "${resolvedRel}") is forbidden. Import via "@/features/${targetInfo.featureKey}" or "@/features/${targetInfo.featureKey}/server".`
       );
     }
   }
