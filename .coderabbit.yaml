@@ -1,0 +1,57 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+
+language: "bg-BG"
+early_access: true
+
+reviews:
+  profile: "assertive"
+  request_changes_workflow: true
+  high_level_summary: true
+  poem: false
+  review_status: true
+  collapse_walkthrough: false
+  path_filters:
+    - "!**/pnpm-lock.yaml"
+    - "!skills-lock.json"
+    - "!.agents/skills/vercel-*/**"
+    - "!.agents/skills/web-design-guidelines/**"
+    - "!.agents/skills/supabase*/**"
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - "main"
+
+  path_instructions:
+    - path: "src/**"
+      instructions: |
+        Провери стриктно всяко изменение спрямо инженерната конституция в `AGENTS.md`:
+        1. Именуване и синтаксис: Всички React UI компоненти ТРЯБВА да са `PascalCase.tsx` и задължително Arrow Functions (без `function` за компоненти). Всички logic/helper/hook/DAL/schema файлове са `camelCase.ts` (изключение за файловите имена са единствено системните Next.js App Router файлове в `src/app/`, `src/proxy.ts` и `src/i18n/request.ts`).
+        2. Next.js 16.4 правила: Забрана за `middleware.ts` (само `src/proxy.ts` с CVE-2025-29927 allowlist header scrubbing). При `cacheComponents: true` всяко четене на `cookies()`, `headers()`, `searchParams` или сесия при React рендериране (`page.tsx`, `layout.tsx`, Server Components) трябва да е зад `<Suspense>`, без top-level `await` на сесия в `layout.tsx` и без `export const dynamic` / `revalidate` (Route Handlers `route.ts` и Server Actions четат `cookies()`/`headers()` директно).
+        3. Размер и Separation of Concerns: Максимум 300 реда на файл. Всеки feature в `src/features/<name>/` експортва клиентски символи само през `index.ts` (без `export *`, без `server-only` импорти) и сървърни символи само през `server.ts`. Без cross-feature deep imports.
+        4. Строг TypeScript, Zod и устойчивост: Забрана за `any`. Двойна Zod бариера (`safeParse`) в `try/catch` за входове и AI отговори, без изтичане на сурови stack traces. Наличие на fallback модел и ясна обработка при недостъпен OpenRouter.
+        5. UI/UX, DRY & A11y: Tailwind v4 градиенти само с `bg-linear-to-*` (без `bg-gradient-to-*`), семантичен HTML5, `aria-label` на интерактивните елементи, `next-intl` без хардкоднати текстове и задължителен `ConfirmDialog` преди всяко изтриване.
+
+    - path: "src/features/**"
+      instructions: |
+        Следи стриктно за сигурност и изолация:
+        1. Defense in Depth: Всеки защитен DAL метод и Route Handler извиква `requireAuthAndPin()` (и проверка на `user_tool_permissions` при отделите).
+        2. Zero-Leakage на пароли: `vault_items` с `is_secret = true` се криптират с `AES-256-GCM`, НИКОГА не се пазят в прав текст, НИКОГА не се векторизират в `pgvector` и НИКОГА не се подават към LLM/OpenRouter. Декриптиране само след Step-Up PIN.
+        3. Scoped RAG & Hard Purge: Всеки отдел чете само разрешените си `knowledge_collections`. Изтриване на документ премахва физическия файл в Storage, всички `document_chunks` и реда в `documents`.
+        4. Изолиран Storage слой: Файловите операции минават единствено през `src/features/storage/server.ts`, за да остане безболезнена миграцията към Cloudflare R2.
+
+    - path: "supabase/**"
+      instructions: |
+        Провери дали всяка таблица и частният Storage bucket имат активиран RLS с точни `auth.uid()` политики, индекси за `collection_id` / `owner_id`, `'simple'` unaccent Full-Text индекс, `HNSW` индекс за `pgvector(1536)` и липса на хардкоднати пароли или PIN кодове в миграциите.
+
+chat:
+  auto_reply: true
+
+knowledge_base:
+  opt_out: false
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - "AGENTS.md"
+      - "ROADMAP.md"
+      - ".agents/skills/**/SKILL.md"
