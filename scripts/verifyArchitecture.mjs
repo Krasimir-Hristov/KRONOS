@@ -172,7 +172,9 @@ const extractModuleSpecifiers = (content) => {
 };
 
 const parseFeaturePath = (relPath) => {
-  const deptMatch = relPath.match(/^src\/features\/(departments\/[^/.]+)(?:\/(.+))?$/);
+  const deptMatch = relPath.match(
+    /^src\/features\/(departments\/(?!(?:index|server|dal)(?:\.|\/|$))[^/.]+)(?:\/(.+))?$/
+  );
   if (deptMatch) {
     return { featureKey: deptMatch[1], subPath: deptMatch[2] ?? '' };
   }
